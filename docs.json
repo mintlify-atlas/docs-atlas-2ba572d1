@@ -38,7 +38,8 @@
               "features/templates",
               "features/version-control",
               "features/pdf-export",
-              "features/guest-mode"
+              "features/guest-mode",
+              "features/ai-assistant"
             ]
           },
           {

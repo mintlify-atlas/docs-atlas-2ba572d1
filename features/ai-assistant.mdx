@@ -1,0 +1,257 @@
+---
+title: AI Assistant
+description: Get intelligent CV improvement suggestions powered by Google Gemini AI
+---
+
+# AI Assistant
+
+CV Builder includes an AI-powered assistant that provides intelligent suggestions to improve your resume content, powered by Google Gemini AI.
+
+## Overview
+
+The AI Assistant analyzes your CV data in real-time and provides:
+- Comprehensive CV reviews
+- Content improvement suggestions
+- Professional writing assistance
+- Skill recommendations based on your experience
+- Profile summary enhancement
+
+<Note>
+  The AI Assistant requires a Google Gemini API key to function. For authenticated users only.
+</Note>
+
+## Features
+
+### Contextual Analysis
+
+The assistant has access to your complete CV data including:
+- Personal information
+- Work experience
+- Education
+- Projects
+- Skills
+- Achievements
+
+It uses this context to provide personalized, relevant suggestions specific to your background.
+
+### Quick Actions
+
+Pre-configured quick actions for common tasks:
+
+<CardGroup cols={3}>
+  <Card title="Full CV Analysis" icon="file-search">
+    Get a comprehensive review of your entire CV with actionable improvements
+  </Card>
+  <Card title="Enhance Summary" icon="lightbulb">
+    Receive suggestions to make your profile summary more impactful
+  </Card>
+  <Card title="Skill Suggestions" icon="target">
+    Discover relevant skills to highlight based on your experience
+  </Card>
+</CardGroup>
+
+### Conversational Interface
+
+Ask the assistant anything about your CV:
+- "How can I improve my work experience descriptions?"
+- "What action verbs should I use?"
+- "Is my CV ATS-friendly?"
+- "Write a professional summary for me"
+- "Suggest improvements for my [section]"
+
+## Setup
+
+### Environment Configuration
+
+Add your Google Gemini API key to `.env.local`:
+
+```bash .env.local
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+<Steps>
+  <Step title="Get Gemini API Key">
+    1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+    2. Sign in with your Google account
+    3. Create a new API key
+    4. Copy the key
+  </Step>
+
+  <Step title="Add to environment">
+    Create or update `.env.local` in your project root:
+    
+    ```bash
+    GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    ```
+  </Step>
+
+  <Step title="Restart development server">
+    Restart your Next.js server to load the new environment variable:
+    
+    ```bash
+    pnpm dev
+    ```
+  </Step>
+</Steps>
+
+## API Endpoint
+
+The AI assistant is powered by a Next.js API route at `/api/chat`.
+
+### Request Format
+
+```typescript
+POST /api/chat
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Analyze my CV and suggest improvements"
+    }
+  ],
+  "cvData": {
+    "personalInfo": { ... },
+    "experience": [ ... ],
+    "education": [ ... ],
+    // ... other CV sections
+  }
+}
+```
+
+### Response Format
+
+```typescript
+{
+  "role": "assistant",
+  "content": "Based on your CV, here are my suggestions..."
+}
+```
+
+### Rate Limiting
+
+- **20 requests per minute** per IP address
+- Rate limit window: 60 seconds
+- Returns `429 Too Many Requests` when exceeded
+
+<Warning>
+  Rate limits apply per IP address. In production, consider implementing user-based rate limiting.
+</Warning>
+
+## Component Integration
+
+The AI Assistant is implemented in `components/ai/AIChatbot.tsx` and uses:
+
+- **`useAuth()`** - Check if user is authenticated
+- **`useChatbotAccess()`** - Verify chatbot is enabled
+- **`useFormContext<CVData>()`** - Access current CV data
+
+### Usage in Editor
+
+```tsx
+import { AIChatbot } from '@/components/ai/AIChatbot';
+
+export default function Editor() {
+  return (
+    <FormProvider {...methods}>
+      {/* Other editor components */}
+      <AIChatbot />
+    </FormProvider>
+  );
+}
+```
+
+The chatbot appears as a draggable floating panel in the editor interface.
+
+## Access Control
+
+The AI Assistant is only available to:
+- Authenticated users (signed in with Firebase)
+- When `GEMINI_API_KEY` is configured
+
+Use the `useChatbotAccess` hook to check availability:
+
+```typescript
+import { useChatbotAccess } from '@/hooks/useChatbotAccess';
+
+function MyComponent() {
+  const { isChatbotEnabled, loading } = useChatbotAccess();
+  
+  if (!isChatbotEnabled) {
+    return <div>AI Assistant not available</div>;
+  }
+  
+  return <AIChatbot />;
+}
+```
+
+## System Prompt
+
+The assistant is configured with a professional system prompt that instructs it to:
+
+1. Act as an expert CV consultant and career coach
+2. Analyze content quality (spelling, grammar, action verbs, impact)
+3. Check completeness (missing sections, empty fields)
+4. Maintain professional tone
+5. Provide specific, actionable advice
+6. Generate high-quality professional text
+7. Never fabricate information about the user
+
+## Error Handling
+
+The API route handles various error cases:
+
+| Error | Status Code | Description |
+|-------|-------------|-------------|
+| Invalid JSON | 400 | Request body is not valid JSON |
+| Invalid request | 400 | Missing or invalid messages/cvData |
+| Rate limit exceeded | 429 | Too many requests in time window |
+| API key not configured | 500 | `GEMINI_API_KEY` environment variable missing |
+| Service unavailable | 503 | Gemini API authentication error |
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Be specific in your questions">
+    Instead of "Improve my CV", ask "How can I make my software engineer experience more impactful?"
+  </Accordion>
+  
+  <Accordion title="Provide context">
+    The assistant works best when you have content in your CV. Fill in at least basic information before asking for help.
+  </Accordion>
+  
+  <Accordion title="Review suggestions critically">
+    The AI provides suggestions, but you should review and adapt them to your specific situation and voice.
+  </Accordion>
+  
+  <Accordion title="Use quick actions for common tasks">
+    Quick actions are pre-configured for the most common CV improvement tasks.
+  </Accordion>
+</AccordionGroup>
+
+## Limitations
+
+- Requires internet connectivity
+- Subject to Gemini API rate limits and quotas
+- Maximum message length: 10,000 characters
+- Chat history limited to last 20 messages
+- Maximum response tokens: 1,000
+
+## Privacy & Security
+
+- CV data is sent to Google Gemini API for processing
+- No CV data is stored on Google's servers permanently
+- Messages are not persisted between sessions
+- Rate limiting prevents abuse
+- User authentication required for access
+
+<Info>
+  For privacy-conscious users, consider using the AI Assistant sparingly or only with anonymized data.
+</Info>
+
+## See Also
+
+- [API Chat Route](/api/components/cv-builder) - Component architecture
+- [Authentication](/guide/authentication) - User authentication setup
+- [Firebase Setup](/advanced/firebase-setup) - Environment configuration
