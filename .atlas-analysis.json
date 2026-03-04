@@ -1,0 +1,133 @@
+{
+  "projectType": "saas",
+  "projectName": "CV Builder",
+  "projectDescription": "A modern, privacy-first resume builder with real-time preview, multiple templates, and cloud sync capabilities.",
+  "theme": "palm",
+  "primaryColor": "#2563eb",
+  "lightColor": "#60a5fa",
+  "darkColor": "#1e40af",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/editor",
+              "features/templates",
+              "features/version-control",
+              "features/pdf-export",
+              "features/guest-mode"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "guide/authentication",
+              "guide/creating-resume",
+              "guide/managing-sections",
+              "guide/managing-versions",
+              "guide/profile-images"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/data-structure",
+              "advanced/firebase-setup",
+              "advanced/local-storage",
+              "advanced/conflict-resolution"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Components",
+            "pages": [
+              "api/components/cv-builder",
+              "api/components/forms",
+              "api/components/preview",
+              "api/components/templates"
+            ]
+          },
+          {
+            "group": "Services",
+            "pages": [
+              "api/services/cv-service",
+              "api/services/draft-storage",
+              "api/services/image-storage",
+              "api/services/validation"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/hooks/use-cv-draft",
+              "api/hooks/use-cv-versions",
+              "api/hooks/use-resume-list"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/types/cv-data",
+              "api/types/version-control",
+              "api/types/merge-result"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "contributing/overview",
+              "contributing/setup",
+              "contributing/architecture",
+              "contributing/code-style"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Privacy-first architecture with guest mode and local storage",
+    "Real-time preview with multiple professional templates",
+    "Version control system with auto-save and conflict resolution",
+    "ATS-friendly PDF export with professional formatting",
+    "Firebase authentication and cloud synchronization",
+    "Intelligent three-way merge for conflict resolution",
+    "Profile image upload with crop and storage",
+    "Flexible section management with drag-and-drop reordering"
+  ],
+  "publicApiSurface": [
+    "CVBuilder - Main resume builder component",
+    "saveCV() - Save CV data to cloud",
+    "loadCV() - Load CV data from cloud",
+    "saveVersion() - Create named version",
+    "restoreVersion() - Restore previous version",
+    "deleteVersion() - Remove version",
+    "generatePDF() - Export resume as PDF",
+    "useCVDraft() - Auto-save draft hook",
+    "useCVVersions() - Version management hook",
+    "useResumeList() - Resume listing hook",
+    "CVData - Main data structure type",
+    "TemplateId - Template selection type",
+    "CVVersion - Version control type"
+  ]
+}
