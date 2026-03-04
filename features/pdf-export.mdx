@@ -1,0 +1,472 @@
+---
+title: "PDF Export"
+description: "Generate professional PDF resumes using @react-pdf/renderer with pixel-perfect output"
+---
+
+## Overview
+
+CV Builder generates high-quality PDF resumes using `@react-pdf/renderer`, ensuring your resume looks professional when downloaded or printed. PDFs are generated on-demand in the browser with no server processing required.
+
+## Implementation
+
+### PDF Generation
+
+The PDF is generated using React components that render to PDF primitives:
+
+```typescript
+// components/cv-builder.tsx:1000-1028
+const handleDownload = React.useCallback(async () => {
+  if (!validateForDownload().canDownload) {
+    toast({ title: getEmptyCVMessage(), type: "info" });
+    return;
+  }
+
+  setIsGenerating(true);
+  try {
+    const blob = await pdf(
+      <PDFDocument data={data} template={template} />
+    ).toBlob();
+    
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `CV-${data.personalInfo?.fullName?.replace(/\s+/g, '-') || 'Export'}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Failed to generate PDF:", error);
+    toast({
+      title: "Failed to generate PDF. Please try again.",
+      description: error.message,
+      type: "error"
+    });
+  } finally {
+    setIsGenerating(false);
+  }
+}, [data, validateForDownload, toast, template]);
+```
+
+### Download Button
+
+The download button shows generation status:
+
+```tsx
+// components/cv-builder.tsx:1030-1036
+<DownloadPDFButton
+  isGenerating={isGenerating}
+  canDownload={canDownload}
+  onClick={handleDownload}
+/>
+```
+
+## PDF Document Structure
+
+### Main PDF Component
+
+```typescript
+// components/preview/PDFDocument.tsx:121-124
+interface PDFDocumentProps {
+  data: CVData;
+  template?: TemplateId;
+}
+
+export function PDFDocument({ data, template }: PDFDocumentProps) {
+  const activeTemplate = template || data.template || 'default';
+  
+  // Route to template-specific PDF
+  if (activeTemplate === 'rhyhorn') {
+    return <RhyhornPDF data={data} />;
+  }
+  
+  if (activeTemplate === "nexus") {
+    return <NexusPDF data={data} />;
+  }
+  
+  // Default template
+  return <Document>...</Document>;
+}
+```
+
+### Font Registration
+
+Carlito font (open-source Calibri alternative) is loaded from GitHub:
+
+```typescript
+// components/preview/PDFDocument.tsx:8-17
+Font.register({
+  family: 'Carlito',
+  fonts: [
+    { 
+      src: 'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Regular.ttf' 
+    },
+    { 
+      src: 'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Bold.ttf', 
+      fontWeight: 'bold' 
+    },
+    { 
+      src: 'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Italic.ttf', 
+      fontStyle: 'italic' 
+    },
+    { 
+      src: 'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-BoldItalic.ttf', 
+      fontWeight: 'bold', 
+      fontStyle: 'italic' 
+    }
+  ]
+});
+```
+
+<Info>
+Carlito is metrically compatible with Calibri, ensuring consistent layout across different systems.
+</Info>
+
+### Page Setup
+
+PDF pages use A4 dimensions with standard margins:
+
+```typescript
+// components/preview/PDFDocument.tsx:23-33
+const styles = StyleSheet.create({
+  page: {
+    fontFamily: "Carlito",
+    fontSize: 11,
+    paddingTop: 36,     // 0.5 inches = 36pt
+    paddingBottom: 36,  // 0.5 inches = 36pt
+    paddingLeft: 36,    // 0.5 inches = 36pt
+    paddingRight: 36,   // 0.5 inches = 36pt
+    color: "#000000",
+    lineHeight: 1.3,
+  },
+});
+```
+
+## Rendering Sections
+
+### Section Ordering
+
+PDF respects user's custom section order and hidden sections:
+
+```typescript
+// components/preview/PDFDocument.tsx:136
+const sectionOrder = getVisibleSections(
+  normalizeSectionOrder(data.sectionOrder), 
+  hiddenSections
+);
+
+// Render sections in order
+{sectionOrder.map((sectionId: SectionId) => {
+  switch (sectionId) {
+    case "personal":
+      return <PersonalSection />;
+    case "skills":
+      return <SkillsSection />;
+    // ... other sections
+  }
+})}
+```
+
+### Section Header Component
+
+Consistent headers across all sections:
+
+```typescript
+// components/preview/PDFDocument.tsx:127-132
+const SectionHeader = ({ title }: { title: string }) => (
+  <View style={styles.sectionHeader}>
+    <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={styles.horizontalLine} />
+  </View>
+);
+```
+
+### Example: Experience Section
+
+```typescript
+// components/preview/PDFDocument.tsx:302-328
+case "experience":
+  if (experience.length === 0) return null;
+  return (
+    <View key={sectionId} style={styles.section}>
+      <SectionHeader title="Relevant Experience" />
+      {experience.map(job => (
+        <View key={job.id} style={styles.itemContainer} wrap={false}>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableLeft}>
+              {job.role}{job.company ? ` at ${job.company}` : ""}
+            </Text>
+            <Text style={styles.tableRight}>
+              {[job.startDate, job.endDate || (job.current ? "Present" : "")]
+                .filter(Boolean)
+                .join(" – ")}
+            </Text>
+          </View>
+          {job.description && job.description.split('\n')
+            .filter(line => line.trim())
+            .map((line, i) => (
+              <View key={i} style={styles.bulletRow}>
+                <Text style={styles.bullet}>•</Text>
+                <Text style={styles.bulletText}>
+                  {line.replace(/^[-•]\s*/, '')}
+                </Text>
+              </View>
+            ))
+          }
+        </View>
+      ))}
+    </View>
+  );
+```
+
+## Styling
+
+### StyleSheet API
+
+`@react-pdf/renderer` uses a CSS-like styling system:
+
+```typescript
+// components/preview/PDFDocument.tsx:35-51
+const styles = StyleSheet.create({
+  section: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontFamily: "Carlito",
+    fontWeight: "bold",
+    color: "#000000",
+    marginBottom: 4,
+  },
+  horizontalLine: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#000000",
+  },
+});
+```
+
+### Color Constants
+
+```typescript
+// components/preview/PDFDocument.tsx:20-21
+const NAVY_BLUE = "#1e4d7b";
+const TEAL = "#2e7d8a";
+```
+
+### Responsive Text
+
+Bullet points with flexible text:
+
+```typescript
+// components/preview/PDFDocument.tsx:70-82
+bulletRow: {
+  flexDirection: "row",
+  paddingLeft: 20,
+  marginBottom: 0, 
+},
+bullet: {
+  width: 12,
+  fontSize: 11,
+},
+bulletText: {
+  fontSize: 11,
+  flex: 1,  // Takes remaining space
+},
+```
+
+## Validation
+
+Before generating PDF, the CV is validated:
+
+```typescript
+// hooks/useCVValidation.ts (conceptual)
+export function useCVValidation({ control, defaultData }) {
+  const canDownload = /* check if CV has content */;
+  
+  const validateForDownload = () => {
+    const isEmpty = getEmptyCVMessage();
+    return { canDownload: !isEmpty };
+  };
+  
+  return { canDownload, validateForDownload };
+}
+```
+
+If the CV is empty, a message is shown:
+
+```typescript
+// lib/backend/cvEmptinessValidator.ts (conceptual)
+export function getEmptyCVMessage(): string {
+  return "Please add your personal information before downloading.";
+}
+```
+
+<Warning>
+You cannot download an empty CV. At minimum, add your name and contact information to enable PDF export.
+</Warning>
+
+## File Naming
+
+PDF files are automatically named using the user's full name:
+
+```typescript
+// components/cv-builder.tsx:1012
+link.download = `CV-${data.personalInfo?.fullName?.replace(/\s+/g, '-') || 'Export'}.pdf`;
+```
+
+Examples:
+- `CV-John-Doe.pdf`
+- `CV-Jane-Smith.pdf`
+- `CV-Export.pdf` (if no name provided)
+
+## Template-Specific PDFs
+
+### Rhyhorn PDF
+
+```typescript
+// components/templates/rhyhorn/RhyhornPDF.tsx
+export function RhyhornPDF({ data }: { data: CVData }) {
+  return (
+    <Document>
+      <Page size="A4" style={rhyhornStyles.page}>
+        {/* Gradient header */}
+        {/* Sections */}
+      </Page>
+    </Document>
+  );
+}
+```
+
+### Nexus PDF
+
+```typescript
+// components/templates/nexus/NexusPDF.tsx
+export function NexusPDF({ data }: { data: CVData }) {
+  return (
+    <Document>
+      <Page size="A4" style={nexusStyles.page}>
+        {/* Two-column layout */}
+        {/* Left sidebar */}
+        {/* Right content */}
+      </Page>
+    </Document>
+  );
+}
+```
+
+<Info>
+Each template maintains its own PDF component to ensure visual consistency between web preview and exported PDF.
+</Info>
+
+## Performance Optimizations
+
+### On-Demand Generation
+
+PDFs are generated only when the download button is clicked:
+
+```typescript
+// components/cv-builder.tsx:1008
+const blob = await pdf(<PDFDocument data={data} template={template} />).toBlob();
+```
+
+This approach:
+- Reduces memory usage
+- Avoids unnecessary processing
+- Ensures PDF matches current form state
+
+### Blob URL Cleanup
+
+Blob URLs are revoked after download to free memory:
+
+```typescript
+// components/cv-builder.tsx:1016
+URL.revokeObjectURL(url);
+```
+
+### Loading States
+
+Generation status is tracked to provide user feedback:
+
+```typescript
+// components/cv-builder.tsx:995-996
+const [isGenerating, setIsGenerating] = React.useState(false);
+
+setIsGenerating(true);
+// ... generate PDF
+setIsGenerating(false);
+```
+
+## Error Handling
+
+PDF generation errors are caught and displayed:
+
+```typescript
+// components/cv-builder.tsx:1018-1024
+catch (error) {
+  console.error("[PDFDownload] Failed to generate PDF:", error);
+  const errorMessage = error instanceof Error ? error.message : "Unknown error";
+  toast({
+    title: "Failed to generate PDF. Please try again.",
+    description: errorMessage.length > 100 
+      ? errorMessage.slice(0, 100) + "..." 
+      : errorMessage,
+    type: "error"
+  });
+}
+```
+
+Common errors:
+- **Font loading failure**: Check network connection
+- **Invalid data**: Ensure all required fields are filled
+- **Browser compatibility**: Use modern browsers (Chrome, Firefox, Safari, Edge)
+
+## Page Breaks
+
+Content is kept together where appropriate:
+
+```typescript
+// components/preview/PDFDocument.tsx:271
+<View key={proj.id} style={styles.itemContainer} wrap={false}>
+  {/* Project content */}
+</View>
+```
+
+The `wrap={false}` prop prevents content from breaking across pages.
+
+## Links in PDF
+
+Clickable links are rendered using the `Link` component:
+
+```typescript
+// components/preview/PDFDocument.tsx:180-186
+{personalInfo.email && (
+  <Link 
+    src={`mailto:${personalInfo.email}`} 
+    style={{ fontSize: 11, color: TEAL, textDecoration: "underline" }}
+  >
+    {personalInfo.email}
+  </Link>
+)}
+```
+
+Supported link types:
+- Email: `mailto:` protocol
+- LinkedIn, GitHub, Portfolio: `https://` URLs
+
+## A4 Format
+
+All PDFs use standard A4 dimensions:
+
+```typescript
+// components/preview/PDFDocument.tsx:155
+<Page size="A4" style={styles.page}>
+```
+
+**A4 Specifications:**
+- Width: 210mm (8.27 inches)
+- Height: 297mm (11.69 inches)
+- Aspect ratio: 1:√2 (1:1.414)
+
+<Note>
+The preview panel displays "A4 Format • 210 × 297 mm" to inform users of the document size.
+</Note>

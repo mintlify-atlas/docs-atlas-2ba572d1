@@ -1,0 +1,441 @@
+---
+title: "Image Storage"
+description: "Profile image validation, optimization, and storage utilities"
+---
+
+The Image Storage service provides utilities for validating, optimizing, and converting profile images for CV applications.
+
+## Overview
+
+The service handles:
+- Image file validation (type and size)
+- Image optimization and compression
+- Image cropping to square dimensions
+- Canvas-based image processing
+- Base64 encoding for storage
+- Firebase Storage integration
+
+**Source:** `lib/backend/cvImageStorage.ts:171`
+
+---
+
+## Constants
+
+```typescript
+const ALLOWED_PROFILE_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const MAX_OPTIMIZED_IMAGE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
+const MAX_PROFILE_IMAGE_RAW_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_BASE64_PROFILE_IMAGE_SIZE_BYTES = 180 * 1024; // 180KB
+const OPTIMIZED_MAX_DIMENSION = 1024; // pixels
+const OPTIMIZED_CROP_DIMENSION = 512; // pixels
+```
+
+---
+
+## Types
+
+### PixelCrop
+
+Defines a rectangular crop area in pixels.
+
+```typescript
+interface PixelCrop {
+  x: number;      // Top-left X coordinate
+  y: number;      // Top-left Y coordinate
+  width: number;  // Crop width
+  height: number; // Crop height
+}
+```
+
+---
+
+## Validation
+
+### validateProfileImageFile
+
+Validates an image file for type and size constraints.
+
+```typescript
+function validateProfileImageFile(file: File): string | null
+```
+
+<ParamField path="file" type="File" required>
+  The image file to validate
+</ParamField>
+
+<ResponseField name="return" type="string | null">
+  Returns error message string if validation fails, null if valid
+</ResponseField>
+
+**Validation Rules:**
+- Must be JPG, PNG, or WEBP format
+- Must be under 10MB raw size
+
+**Example:**
+```typescript
+import { validateProfileImageFile } from '@/lib/backend/cvImageStorage';
+
+function handleFileSelect(file: File) {
+  const error = validateProfileImageFile(file);
+  
+  if (error) {
+    alert(error);
+    return;
+  }
+  
+  // Proceed with upload
+  processImage(file);
+}
+```
+
+**Error Messages:**
+- `"Only JPG, PNG, or WEBP images are supported."`
+- `"Image is too large. Please choose a file under 10MB."`
+
+---
+
+## Optimization
+
+### optimizeProfileImage
+
+Optimizes and optionally crops an image file for profile use.
+
+```typescript
+async function optimizeProfileImage(
+  file: File,
+  cropArea?: PixelCrop
+): Promise<File>
+```
+
+<ParamField path="file" type="File" required>
+  The image file to optimize
+</ParamField>
+
+<ParamField path="cropArea" type="PixelCrop" optional>
+  Optional crop area. If provided, creates a 512x512 square crop
+</ParamField>
+
+<ResponseField name="return" type="Promise<File>">
+  Returns optimized image file as JPEG
+</ResponseField>
+
+**Optimization Process:**
+
+1. **With Crop Area:**
+   - Reads image from file
+   - Crops to specified area
+   - Resizes to 512x512 square
+
+2. **Without Crop Area:**
+   - Reads image from file
+   - Scales down if larger than 1024px
+   - Maintains aspect ratio
+
+3. **Compression:**
+   - Converts to JPEG format
+   - Tries quality steps: [0.86, 0.78, 0.7, 0.62, 0.55, 0.48]
+   - Stops at first quality under 2MB
+
+**Example:**
+```typescript
+import { optimizeProfileImage } from '@/lib/backend/cvImageStorage';
+
+// Simple optimization
+const optimized = await optimizeProfileImage(file);
+console.log('Optimized size:', optimized.size);
+
+// With cropping
+const cropArea = {
+  x: 100,
+  y: 50,
+  width: 400,
+  height: 400
+};
+const cropped = await optimizeProfileImage(file, cropArea);
+```
+
+**Error Handling:**
+```typescript
+try {
+  const optimized = await optimizeProfileImage(file, cropArea);
+} catch (error) {
+  if (error.message.includes('still too large')) {
+    alert('Image is too large. Try cropping tighter.');
+  } else {
+    alert('Failed to process image.');
+  }
+}
+```
+
+**Output Format:**
+- Type: `image/jpeg`
+- Filename: `profile-{timestamp}.jpg`
+- Quality: Automatically adjusted to meet size limit
+- Uses JPEG for reliable PDF compatibility
+
+---
+
+## Conversion
+
+### fileToDataUrl
+
+Converts a file to a data URL (base64 encoded).
+
+```typescript
+function fileToDataUrl(file: File): Promise<string>
+```
+
+<ParamField path="file" type="File" required>
+  The file to convert
+</ParamField>
+
+<ResponseField name="return" type="Promise<string>">
+  Returns data URL string (e.g., `data:image/jpeg;base64,...`)
+</ResponseField>
+
+**Example:**
+```typescript
+import { fileToDataUrl } from '@/lib/backend/cvImageStorage';
+
+const dataUrl = await fileToDataUrl(file);
+console.log('Data URL:', dataUrl.substring(0, 50) + '...');
+
+// Use in img tag
+setImageSrc(dataUrl);
+```
+
+**Use Cases:**
+- Previewing images before upload
+- Storing small images inline
+- Generating PDF-compatible image data
+
+---
+
+### toBase64ProfileImage
+
+Converts an optimized image file to base64 with size validation.
+
+```typescript
+async function toBase64ProfileImage(file: File): Promise<string>
+```
+
+<ParamField path="file" type="File" required>
+  The optimized image file to convert (should already be optimized)
+</ParamField>
+
+<ResponseField name="return" type="Promise<string>">
+  Returns base64 data URL string
+</ResponseField>
+
+**Behavior:**
+- Validates file size is under 180KB
+- Throws error if too large
+- Converts to data URL
+
+**Example:**
+```typescript
+import { 
+  optimizeProfileImage, 
+  toBase64ProfileImage 
+} from '@/lib/backend/cvImageStorage';
+
+// Complete workflow
+try {
+  // 1. Optimize image
+  const optimized = await optimizeProfileImage(file, cropArea);
+  
+  // 2. Convert to base64
+  const base64 = await toBase64ProfileImage(optimized);
+  
+  // 3. Store in CV data
+  cvData.personalInfo.profileImageUrl = base64;
+  
+} catch (error) {
+  if (error.message.includes('still too large')) {
+    alert('Image is still too large after optimization. Please crop tighter.');
+  }
+}
+```
+
+**Error Messages:**
+- `"Image is still too large after optimization. Please crop tighter."`
+- `"Failed to convert image."`
+
+---
+
+## Internal Functions
+
+### createBlobFromCanvas
+
+Creates a Blob from an HTML canvas element.
+
+```typescript
+function createBlobFromCanvas(
+  canvas: HTMLCanvasElement,
+  mimeType: string,
+  quality: number
+): Promise<Blob>
+```
+
+**Internal use only** - Used by optimization pipeline.
+
+---
+
+### readImageFromFile
+
+Reads an image file into an HTMLImageElement.
+
+```typescript
+function readImageFromFile(file: File): Promise<HTMLImageElement>
+```
+
+**Internal use only** - Used by optimization pipeline.
+
+---
+
+### drawCroppedSquare
+
+Draws a cropped square image onto canvas.
+
+```typescript
+function drawCroppedSquare(
+  canvas: HTMLCanvasElement,
+  image: HTMLImageElement,
+  cropArea: PixelCrop
+): void
+```
+
+**Internal use only** - Used when crop area is provided.
+
+**Behavior:**
+- Sets canvas to 512x512
+- Safely handles crop boundaries
+- Floors coordinates to integers
+- Ensures minimum 1px dimensions
+
+---
+
+### drawScaledImage
+
+Draws a scaled image onto canvas maintaining aspect ratio.
+
+```typescript
+function drawScaledImage(
+  canvas: HTMLCanvasElement,
+  image: HTMLImageElement
+): void
+```
+
+**Internal use only** - Used when no crop area is provided.
+
+**Behavior:**
+- Scales down if larger than 1024px
+- Maintains aspect ratio
+- Sets canvas to target dimensions
+
+---
+
+## Complete Workflow Example
+
+```typescript
+import {
+  validateProfileImageFile,
+  optimizeProfileImage,
+  toBase64ProfileImage,
+  PixelCrop
+} from '@/lib/backend/cvImageStorage';
+import { saveCV } from '@/lib/cvService';
+
+async function handleProfileImageUpload(
+  file: File,
+  cropArea: PixelCrop,
+  userId: string,
+  cvData: CVData
+) {
+  // 1. Validate file
+  const validationError = validateProfileImageFile(file);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  // 2. Optimize and crop
+  const optimizedFile = await optimizeProfileImage(file, cropArea);
+  console.log('Optimized size:', optimizedFile.size / 1024, 'KB');
+
+  // 3. Convert to base64
+  const base64DataUrl = await toBase64ProfileImage(optimizedFile);
+
+  // 4. Update CV data
+  const updatedData = {
+    ...cvData,
+    personalInfo: {
+      ...cvData.personalInfo,
+      profileImageUrl: base64DataUrl
+    }
+  };
+
+  // 5. Save to cloud
+  await saveCV(userId, updatedData);
+
+  return base64DataUrl;
+}
+
+// Usage
+try {
+  const imageUrl = await handleProfileImageUpload(
+    selectedFile,
+    { x: 50, y: 50, width: 400, height: 400 },
+    userId,
+    cvData
+  );
+  
+  console.log('Profile image uploaded successfully');
+} catch (error) {
+  console.error('Upload failed:', error.message);
+}
+```
+
+---
+
+## Browser Compatibility
+
+This service uses:
+- `HTMLCanvasElement` API
+- `FileReader` API
+- `Image` API
+- `URL.createObjectURL` and `URL.revokeObjectURL`
+
+Supported in all modern browsers (Chrome, Firefox, Safari, Edge).
+
+---
+
+## Performance Notes
+
+- Image processing is CPU-intensive
+- Use web workers for large images if needed
+- Show loading indicator during optimization
+- Consider batch processing for multiple images
+
+**Example with loading state:**
+```typescript
+setLoading(true);
+try {
+  const optimized = await optimizeProfileImage(file, cropArea);
+  const base64 = await toBase64ProfileImage(optimized);
+  // Use base64...
+} finally {
+  setLoading(false);
+}
+```
+
+---
+
+## Related Services
+
+- [CV Service](/api/services/cv-service) - CV data management
+- [Validation](/api/services/validation) - Data validation

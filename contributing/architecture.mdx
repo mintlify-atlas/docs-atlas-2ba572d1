@@ -1,0 +1,460 @@
+---
+title: Architecture Guide
+description: Understand the architecture and design patterns used in CV Builder
+---
+
+This guide explains the architecture, design patterns, and key technical decisions in CV Builder.
+
+## Tech Stack
+
+CV Builder is built with modern web technologies:
+
+- **Next.js 16.1.6**: React framework with App Router
+- **React 19.2.3**: UI library with React Compiler enabled
+- **TypeScript 5**: Type-safe development with strict mode
+- **Tailwind CSS 4**: Utility-first styling framework
+- **Firebase 12.8.0**: Authentication and Firestore database
+- **React Hook Form 7.71.1**: Performant form management
+- **Zod 4.3.6**: Schema validation
+- **Framer Motion 12.29.2**: Animations and transitions
+
+## Project Structure
+
+### App Directory (Next.js App Router)
+
+```
+app/
+├── api/                    # API routes
+│   └── generate-pdf/       # PDF generation endpoint
+├── editor/                 # CV editor page
+│   └── page.tsx
+├── resumes/                # Resume management
+│   ├── page.tsx            # Resume list
+│   └── [id]/               # Individual resume
+│       └── page.tsx
+├── templates/              # Template preview
+│   └── page.tsx
+├── globals.css             # Global styles
+├── layout.tsx              # Root layout with providers
+├── page.tsx                # Landing page
+├── icon.svg                # Favicon
+└── apple-icon.svg          # Apple touch icon
+```
+
+**Key Points:**
+- Uses Next.js App Router for file-based routing
+- Server and Client Components separated appropriately
+- API routes for server-side operations (PDF generation)
+- Layouts for shared UI across routes
+
+### Components Directory
+
+```
+components/
+├── ai/
+│   └── AIChatbot.tsx           # AI-powered resume assistant
+├── forms/
+│   ├── PersonalDetailsForm.tsx # Personal info section
+│   ├── ExperienceForm.tsx      # Work experience
+│   ├── EducationForm.tsx       # Education section
+│   ├── ProjectsForm.tsx        # Projects section
+│   ├── SkillsForm.tsx          # Skills section
+│   ├── AchievementsForm.tsx    # Achievements/certifications
+│   ├── LanguagesForm.tsx       # Languages section
+│   ├── ReferencesForm.tsx      # References section
+│   ├── ProfileImageUpload.tsx  # Image upload & crop
+│   └── SortableFormList.tsx    # Reusable sortable list
+├── home/
+│   ├── Hero.tsx                # Landing page hero
+│   ├── Features.tsx            # Feature showcase
+│   ├── HowItWorks.tsx          # How it works section
+│   ├── TemplateGrid.tsx        # Template gallery
+│   ├── TemplateCard.tsx        # Template card component
+│   ├── ResumePreview.tsx       # Interactive preview
+│   ├── CTA.tsx                 # Call to action
+│   └── Footer.tsx              # Footer
+├── layout/
+│   └── Navbar.tsx              # Navigation bar
+├── preview/
+│   ├── CVPreview.tsx           # Live resume preview
+│   └── PDFDocument.tsx         # PDF template
+├── resumes/
+│   ├── ResumeCard.tsx          # Resume card component
+│   ├── ResumeList.tsx          # Resume grid/list
+│   └── VersionsList.tsx        # Version history UI
+├── templates/
+│   ├── default/                # Default template
+│   ├── rhyhorn/                # Rhyhorn template
+│   └── nexus/                  # Nexus template
+├── ui/
+│   ├── button.tsx              # Button component
+│   ├── input.tsx               # Input component
+│   ├── textarea.tsx            # Textarea component
+│   ├── select.tsx              # Select component
+│   ├── dialog.tsx              # Modal dialog
+│   ├── card.tsx                # Card component
+│   └── ...                     # Other UI primitives
+└── cv-builder.tsx              # Main CV builder component
+```
+
+**Component Organization:**
+- **forms/**: Form section components using React Hook Form
+- **home/**: Landing page sections
+- **preview/**: Resume preview and PDF generation
+- **templates/**: Template implementations
+- **ui/**: Reusable UI components built with CVA (Class Variance Authority)
+
+### Hooks Directory
+
+```
+hooks/
+├── useBackNavigation.ts        # Back button navigation logic
+├── useCVDraft.ts               # Draft auto-save & sync
+├── useCVValidation.ts          # Form validation logic
+├── useCVVersions.ts            # Version CRUD operations
+├── useCVVersionsList.ts        # Version list fetching
+├── useChatbotAccess.ts         # AI chatbot state
+├── useNormalizedCVData.ts      # Data normalization
+├── useResumeDetail.ts          # Single resume fetching
+├── useResumeList.ts            # Resume list fetching
+└── useScrollSpy.ts             # Scroll spy for navigation
+```
+
+**Custom Hooks:**
+- Encapsulate complex state logic
+- Handle data fetching and caching
+- Manage side effects (auto-save, sync)
+- Provide reusable business logic
+
+### Lib Directory
+
+```
+lib/
+├── backend/
+│   ├── cvDraftStorage.ts       # Draft persistence layer
+│   ├── cvEmptinessValidator.ts # Empty resume detection
+│   ├── cvImageStorage.ts       # Image upload/storage
+│   ├── cvRepository.ts         # Firestore CRUD operations
+│   ├── cvThreeWayMerge.ts      # Conflict resolution
+│   └── cvValidation.ts         # Server-side validation
+├── AuthContext.tsx             # Authentication provider
+├── authValidation.ts           # Auth form validation
+├── cvService.ts                # CV business logic layer
+├── firebase.ts                 # Firebase initialization
+├── types.ts                    # Shared TypeScript types
+└── utils.ts                    # Utility functions
+```
+
+**Backend Services:**
+- **cvRepository.ts**: Database operations (Firestore)
+- **cvDraftStorage.ts**: Local storage management
+- **cvThreeWayMerge.ts**: Three-way merge for draft conflicts
+- **cvService.ts**: Business logic orchestration
+
+## Key Architectural Decisions
+
+### 1. Privacy-First Design
+
+**Guest Mode with localStorage:**
+- Full functionality without authentication
+- Data persists locally in browser
+- No server dependency for basic usage
+
+**Optional Cloud Sync:**
+- Users opt-in to cloud storage
+- Seamless transition from guest to authenticated
+
+### 2. Dual Storage Strategy
+
+```typescript
+// lib/cvService.ts
+export class CVService {
+  // Local storage for drafts
+  private draftStorage: CVDraftStorage;
+  
+  // Cloud storage for saved resumes
+  private repository: CVRepository;
+  
+  // Three-way merge for conflicts
+  private merger: CVThreeWayMerge;
+}
+```
+
+**Draft System:**
+- Auto-saves to localStorage every few seconds
+- Cloud-synced users also save drafts to Firestore
+- Conflict resolution when local and cloud diverge
+
+**Version System:**
+- Explicit "Save Version" creates immutable snapshots
+- Versions include metadata (name, description, tags)
+- Restore any previous version
+
+### 3. Form Management
+
+**React Hook Form + Zod:**
+```typescript
+// Example form component
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+const schema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email'),
+});
+
+function PersonalDetailsForm() {
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: cvData.personalDetails,
+  });
+  
+  // Auto-save on change
+  useEffect(() => {
+    const subscription = form.watch((data) => {
+      saveDraft(data);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+}
+```
+
+**Benefits:**
+- Type-safe form validation
+- Performant re-renders
+- Built-in error handling
+- Easy integration with auto-save
+
+### 4. Template System
+
+**Template Structure:**
+```
+templates/
+└── [template-name]/
+    ├── index.tsx               # Web preview component
+    └── pdf.tsx                 # PDF version
+```
+
+**Dual Rendering:**
+- **Web Preview**: React components with Tailwind CSS
+- **PDF Export**: @react-pdf/renderer with similar styling
+
+**Template Selection:**
+- Users can switch templates without data loss
+- Same data structure works across all templates
+- CSS variables for theme customization
+
+### 5. State Management
+
+**Context for Global State:**
+- `AuthContext`: User authentication state
+- Minimal use of context to avoid re-render issues
+
+**Local State for UI:**
+- Form state managed by React Hook Form
+- UI state (modals, tabs) with useState
+
+**Server State:**
+- Custom hooks for data fetching
+- No external state management library
+
+### 6. Type Safety
+
+**Centralized Types:**
+```typescript
+// lib/types.ts
+export interface CVData {
+  personalDetails: PersonalDetails;
+  experience: Experience[];
+  education: Education[];
+  // ...
+}
+
+export interface CVVersion {
+  id: string;
+  cvData: CVData;
+  name: string;
+  createdAt: Date;
+  // ...
+}
+```
+
+**Type Inference:**
+- Zod schemas derive types
+- TypeScript strict mode enabled
+- Comprehensive type coverage
+
+## Component Patterns
+
+### 1. Compound Components
+
+```typescript
+// Card component with subcomponents
+export function Card({ children }: Props) {
+  return <div className="card">{children}</div>;
+}
+
+Card.Header = CardHeader;
+Card.Content = CardContent;
+Card.Footer = CardFooter;
+
+// Usage
+<Card>
+  <Card.Header>Title</Card.Header>
+  <Card.Content>Content</Card.Content>
+</Card>
+```
+
+### 2. Render Props for Flexibility
+
+```typescript
+function SortableFormList({ items, renderItem }: Props) {
+  return (
+    <div>
+      {items.map((item) => renderItem(item))}
+    </div>
+  );
+}
+```
+
+### 3. Custom Hooks for Logic
+
+```typescript
+// Extract complex logic into hooks
+function useCVDraft() {
+  const [draft, setDraft] = useState<CVData | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Auto-save logic
+  const saveDraft = useCallback(async (data: CVData) => {
+    setIsSaving(true);
+    await cvService.saveDraft(data);
+    setIsSaving(false);
+  }, []);
+  
+  return { draft, saveDraft, isSaving };
+}
+```
+
+### 4. Composition over Inheritance
+
+```typescript
+// Prefer composition
+function FeatureCard({ icon: Icon, title, description }: Props) {
+  return (
+    <Card>
+      <Icon className="icon" />
+      <h3>{title}</h3>
+      <p>{description}</p>
+    </Card>
+  );
+}
+```
+
+## Data Flow
+
+### Resume Editing Flow
+
+```
+1. User edits form → React Hook Form state
+2. Form watch triggers → useCVDraft hook
+3. Debounced save → CVService.saveDraft()
+4. Storage layer → localStorage + Firestore (if authenticated)
+5. Preview updates → CVPreview component re-renders
+```
+
+### Version Management Flow
+
+```
+1. User clicks "Save Version" → useCVVersions hook
+2. CVService.saveVersion() → Creates immutable snapshot
+3. CVRepository.saveVersion() → Firestore write
+4. Version list updates → useCVVersionsList refetches
+5. UI shows new version → VersionsList component
+```
+
+## Performance Optimizations
+
+### 1. Code Splitting
+
+- Dynamic imports for heavy components
+- Route-based splitting via Next.js App Router
+- Template components loaded on-demand
+
+### 2. React Compiler
+
+Next.js 16 with React Compiler enabled:
+- Automatic memoization
+- Optimized re-renders
+- Better performance without manual optimization
+
+### 3. Debounced Auto-Save
+
+```typescript
+const debouncedSave = useMemo(
+  () => debounce((data: CVData) => saveDraft(data), 2000),
+  []
+);
+```
+
+### 4. Image Optimization
+
+- Next.js Image component for optimized loading
+- Client-side image cropping
+- Compressed uploads to Firebase Storage
+
+## Testing Strategy
+
+While not extensively covered in the current codebase, here's the recommended approach:
+
+### Unit Tests
+- Test utility functions (lib/utils.ts)
+- Test validation schemas (Zod schemas)
+- Test custom hooks (hooks/)
+
+### Integration Tests
+- Test form submission flows
+- Test draft auto-save behavior
+- Test version management
+
+### E2E Tests
+- Test complete user journeys
+- Test guest mode flows
+- Test authentication flows
+
+## Security Considerations
+
+### 1. Firestore Security Rules
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/resumes/{resumeId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+  }
+}
+```
+
+### 2. Client-Side Validation
+
+All forms validated with Zod schemas before submission.
+
+### 3. Environment Variables
+
+Sensitive keys stored in `.env.local`, never committed.
+
+## Next Steps
+
+Now that you understand the architecture:
+
+1. Review the [Code Style Guide](/contributing/code-style)
+2. Explore the codebase starting with `app/page.tsx`
+3. Look at `components/cv-builder.tsx` for the main editor
+4. Check out `lib/cvService.ts` for business logic
+
+---
+
+Questions about the architecture? Open an issue on GitHub!

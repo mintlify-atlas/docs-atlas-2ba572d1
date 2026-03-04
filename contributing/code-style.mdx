@@ -1,0 +1,708 @@
+---
+title: Code Style Guide
+description: Coding standards and best practices for CV Builder
+---
+
+This guide outlines the coding standards and best practices for contributing to CV Builder.
+
+## General Principles
+
+- **Consistency**: Follow existing patterns in the codebase
+- **Readability**: Write code that's easy to understand
+- **Type Safety**: Leverage TypeScript's type system
+- **Performance**: Optimize for user experience
+- **Accessibility**: Build inclusive interfaces
+
+## TypeScript Guidelines
+
+### Strict Mode
+
+CV Builder uses TypeScript strict mode. All type checks must pass:
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler"
+  }
+}
+```
+
+### Type Definitions
+
+**Use explicit types for function parameters and return values:**
+
+```typescript
+// ✅ Good
+function calculateTotal(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
+
+// ❌ Bad
+function calculateTotal(items) {
+  return items.reduce((sum, item) => sum + item.price, 0);
+}
+```
+
+**Define interfaces for complex objects:**
+
+```typescript
+// ✅ Good
+interface PersonalDetails {
+  name: string;
+  email: string;
+  phone?: string;
+  summary?: string;
+}
+
+// ❌ Bad
+const personalDetails: any = { ... };
+```
+
+**Use type inference for simple cases:**
+
+```typescript
+// ✅ Good - inference is clear
+const count = 0;
+const name = 'John';
+
+// ❌ Unnecessary - inference works
+const count: number = 0;
+const name: string = 'John';
+```
+
+### Avoid `any` Type
+
+```typescript
+// ✅ Good
+function handleChange(event: React.ChangeEvent<HTMLInputElement>): void {
+  console.log(event.target.value);
+}
+
+// ❌ Bad
+function handleChange(event: any): void {
+  console.log(event.target.value);
+}
+```
+
+If you must use `any`, add a comment explaining why.
+
+### Type Imports
+
+```typescript
+// ✅ Good - explicit type imports
+import type { CVData, PersonalDetails } from '@/lib/types';
+import { useState } from 'react';
+
+// ✅ Also acceptable
+import { type CVData, type PersonalDetails } from '@/lib/types';
+```
+
+## Naming Conventions
+
+### Files and Directories
+
+- **Components**: PascalCase with `.tsx` extension
+  - `PersonalDetailsForm.tsx`
+  - `CVPreview.tsx`
+  - `TemplateCard.tsx`
+
+- **Utilities**: camelCase with `.ts` extension
+  - `cvService.ts`
+  - `authValidation.ts`
+  - `utils.ts`
+
+- **Hooks**: camelCase starting with `use`
+  - `useCVDraft.ts`
+  - `useCVVersions.ts`
+  - `useScrollSpy.ts`
+
+- **Directories**: kebab-case or lowercase
+  - `components/forms/`
+  - `lib/backend/`
+  - `app/editor/`
+
+### Variables and Functions
+
+```typescript
+// ✅ Good - descriptive names
+const resumeData = getResumeData();
+const isAuthenticated = checkAuthStatus();
+const handleSubmit = () => { ... };
+
+// ❌ Bad - unclear names
+const data = getData();
+const flag = check();
+const handler = () => { ... };
+```
+
+### Components
+
+```typescript
+// ✅ Good - PascalCase for components
+function PersonalDetailsForm({ data }: Props) {
+  return <div>...</div>;
+}
+
+export default PersonalDetailsForm;
+```
+
+### Constants
+
+```typescript
+// ✅ Good - UPPER_SNAKE_CASE for constants
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_EXTENSIONS = ['.jpg', '.png', '.pdf'];
+const API_ENDPOINT = '/api/generate-pdf';
+```
+
+### Boolean Variables
+
+```typescript
+// ✅ Good - use is/has/should prefixes
+const isLoading = true;
+const hasError = false;
+const shouldAutoSave = true;
+
+// ❌ Bad - unclear intent
+const loading = true;
+const error = false;
+const autoSave = true;
+```
+
+## React Patterns
+
+### Component Structure
+
+```typescript
+// Recommended component structure
+import { useState, useEffect } from 'react';
+import type { ComponentProps } from './types';
+import { Button } from '@/components/ui/button';
+
+interface Props {
+  title: string;
+  onSave: (data: FormData) => void;
+}
+
+export function MyComponent({ title, onSave }: Props) {
+  // 1. Hooks
+  const [data, setData] = useState<FormData | null>(null);
+  
+  // 2. Effects
+  useEffect(() => {
+    fetchData();
+  }, []);
+  
+  // 3. Event handlers
+  const handleSubmit = () => {
+    if (data) onSave(data);
+  };
+  
+  // 4. Render helpers (if needed)
+  const renderContent = () => {
+    return <div>...</div>;
+  };
+  
+  // 5. Return JSX
+  return (
+    <div>
+      <h1>{title}</h1>
+      <Button onClick={handleSubmit}>Save</Button>
+    </div>
+  );
+}
+```
+
+### Props Destructuring
+
+```typescript
+// ✅ Good - destructure in parameters
+function Card({ title, description, children }: CardProps) {
+  return <div>...</div>;
+}
+
+// ❌ Bad - using props object
+function Card(props: CardProps) {
+  return <div>{props.title}</div>;
+}
+```
+
+### Event Handlers
+
+```typescript
+// ✅ Good - prefix with 'handle'
+const handleClick = () => { ... };
+const handleSubmit = () => { ... };
+const handleChange = () => { ... };
+
+// Props should use 'on' prefix
+interface Props {
+  onClick: () => void;
+  onSubmit: (data: FormData) => void;
+  onChange: (value: string) => void;
+}
+```
+
+### Conditional Rendering
+
+```typescript
+// ✅ Good - ternary for simple conditions
+{isLoading ? <Spinner /> : <Content />}
+
+// ✅ Good - && for single branch
+{error && <ErrorMessage error={error} />}
+
+// ✅ Good - early return for complex conditions
+function Component() {
+  if (isLoading) return <Spinner />;
+  if (error) return <ErrorMessage error={error} />;
+  return <Content />;
+}
+```
+
+## Tailwind CSS Usage
+
+### Class Organization
+
+Order classes logically:
+
+```tsx
+// ✅ Good - organized by category
+<div className="
+  // Layout
+  flex items-center justify-between
+  // Spacing
+  px-4 py-2 gap-2
+  // Sizing
+  w-full h-12
+  // Appearance
+  bg-white rounded-lg shadow-md
+  // Typography
+  text-sm font-medium text-gray-900
+  // States
+  hover:bg-gray-50 active:scale-95
+  // Dark mode
+  dark:bg-gray-800 dark:text-white
+">
+  Content
+</div>
+```
+
+### Component Variants with CVA
+
+Use Class Variance Authority for component variants:
+
+```typescript
+import { cva, type VariantProps } from 'class-variance-authority';
+
+const buttonVariants = cva(
+  // Base styles
+  'inline-flex items-center justify-center rounded-md font-medium transition-colors',
+  {
+    variants: {
+      variant: {
+        default: 'bg-blue-600 text-white hover:bg-blue-700',
+        outline: 'border border-gray-300 hover:bg-gray-50',
+        ghost: 'hover:bg-gray-100',
+      },
+      size: {
+        sm: 'h-8 px-3 text-sm',
+        md: 'h-10 px-4',
+        lg: 'h-12 px-6 text-lg',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'md',
+    },
+  }
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {}
+
+export function Button({ variant, size, className, ...props }: ButtonProps) {
+  return (
+    <button
+      className={buttonVariants({ variant, size, className })}
+      {...props}
+    />
+  );
+}
+```
+
+### Utility Function for Class Names
+
+```typescript
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+// Use this helper to merge Tailwind classes
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// Usage
+<div className={cn(
+  'base-classes',
+  isActive && 'active-classes',
+  className
+)} />
+```
+
+## Dark Mode Support
+
+### Always Include Dark Mode Styles
+
+```tsx
+// ✅ Good - includes dark mode
+<div className="
+  bg-white text-gray-900
+  dark:bg-gray-900 dark:text-white
+">
+  Content
+</div>
+
+// ❌ Bad - missing dark mode
+<div className="bg-white text-gray-900">
+  Content
+</div>
+```
+
+### Color Palette Guidelines
+
+```tsx
+// Use semantic color names
+<div className="
+  // Background
+  bg-background
+  // Text
+  text-foreground
+  // Borders
+  border-border
+  // Muted text
+  text-muted-foreground
+">
+```
+
+Or use Tailwind's gray scale with dark variants:
+
+```tsx
+<div className="
+  bg-gray-50 text-gray-900
+  dark:bg-gray-900 dark:text-gray-100
+">
+```
+
+### Test Dark Mode
+
+Always test your changes in both light and dark mode:
+
+```typescript
+// Toggle dark mode in browser console
+document.documentElement.classList.toggle('dark');
+```
+
+## Form Validation with Zod
+
+### Schema Definition
+
+```typescript
+import { z } from 'zod';
+
+// ✅ Good - descriptive error messages
+const personalDetailsSchema = z.object({
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(100, 'Name must be less than 100 characters'),
+  email: z.string()
+    .email('Invalid email address'),
+  phone: z.string()
+    .regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number')
+    .optional(),
+  summary: z.string()
+    .max(500, 'Summary must be less than 500 characters')
+    .optional(),
+});
+
+export type PersonalDetails = z.infer<typeof personalDetailsSchema>;
+```
+
+### Form Integration
+
+```typescript
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+function PersonalDetailsForm() {
+  const form = useForm<PersonalDetails>({
+    resolver: zodResolver(personalDetailsSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      summary: '',
+    },
+  });
+  
+  const onSubmit = form.handleSubmit((data) => {
+    // data is fully typed and validated
+    console.log(data);
+  });
+  
+  return <form onSubmit={onSubmit}>...</form>;
+}
+```
+
+## ESLint Configuration
+
+CV Builder uses Next.js ESLint configuration:
+
+```javascript
+// eslint.config.mjs
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+```
+
+### Run Linting
+
+```bash
+# Check for linting errors
+pnpm lint
+
+# Auto-fix issues (if available)
+pnpm lint --fix
+```
+
+### Common Rules
+
+- No unused variables
+- No console.log in production code (use console.error for errors)
+- Prefer const over let
+- Use template literals instead of string concatenation
+
+## Git Commit Messages
+
+### Conventional Commits
+
+Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```bash
+# Format
+<type>: <description>
+
+[optional body]
+
+[optional footer]
+```
+
+### Commit Types
+
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, missing semicolons, etc.)
+- `refactor:` - Code refactoring
+- `perf:` - Performance improvements
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks, dependency updates
+
+### Examples
+
+```bash
+# ✅ Good commits
+git commit -m "feat: add PDF export for rhyhorn template"
+git commit -m "fix: resolve dark mode contrast issue in forms"
+git commit -m "docs: update architecture guide with template system"
+git commit -m "refactor: extract validation logic into custom hook"
+
+# ❌ Bad commits
+git commit -m "fixed stuff"
+git commit -m "updates"
+git commit -m "WIP"
+```
+
+### Commit Message Body
+
+For complex changes, add a body:
+
+```bash
+git commit -m "feat: add three-way merge for draft conflicts
+
+Implements a three-way merge algorithm to resolve conflicts between
+local drafts and cloud-saved data. Uses base version from last sync
+to intelligently merge changes.
+
+Closes #123"
+```
+
+## Code Comments
+
+### When to Comment
+
+```typescript
+// ✅ Good - explains WHY, not WHAT
+// Use three-way merge to preserve both local and remote changes
+const merged = threeWayMerge(base, local, remote);
+
+// ✅ Good - explains complex algorithm
+/**
+ * Calculates the optimal line breaks for justified text.
+ * Uses dynamic programming to minimize the sum of squared
+ * whitespace at the end of each line.
+ */
+function calculateLineBreaks(text: string, maxWidth: number) { ... }
+
+// ❌ Bad - explains obvious code
+// Set loading to true
+setLoading(true);
+
+// ❌ Bad - outdated comment
+// TODO: Fix this later
+const data = processData(); // This is already fixed
+```
+
+### JSDoc for Public APIs
+
+```typescript
+/**
+ * Saves a resume version to the database.
+ * 
+ * @param cvData - The resume data to save
+ * @param metadata - Version metadata (name, description, tags)
+ * @returns The saved version with generated ID
+ * @throws {FirebaseError} If the save operation fails
+ */
+export async function saveVersion(
+  cvData: CVData,
+  metadata: VersionMetadata
+): Promise<CVVersion> {
+  // ...
+}
+```
+
+## Performance Best Practices
+
+### Debounce Heavy Operations
+
+```typescript
+import { useMemo } from 'react';
+import { debounce } from 'lodash';
+
+const debouncedSave = useMemo(
+  () => debounce((data: CVData) => saveDraft(data), 2000),
+  []
+);
+```
+
+### Lazy Load Components
+
+```typescript
+import dynamic from 'next/dynamic';
+
+const PDFPreview = dynamic(() => import('./PDFPreview'), {
+  ssr: false,
+  loading: () => <Spinner />,
+});
+```
+
+### Optimize Images
+
+```typescript
+import Image from 'next/image';
+
+<Image
+  src="/profile.jpg"
+  alt="Profile"
+  width={200}
+  height={200}
+  priority // For above-the-fold images
+/>
+```
+
+## Accessibility
+
+### Semantic HTML
+
+```tsx
+// ✅ Good - semantic elements
+<nav>
+  <ul>
+    <li><a href="/">Home</a></li>
+  </ul>
+</nav>
+
+// ❌ Bad - divs for everything
+<div>
+  <div onClick={...}>Home</div>
+</div>
+```
+
+### ARIA Labels
+
+```tsx
+// ✅ Good - descriptive labels
+<button aria-label="Close dialog">
+  <X className="h-4 w-4" />
+</button>
+
+<input
+  type="email"
+  aria-label="Email address"
+  aria-describedby="email-error"
+/>
+{error && <span id="email-error" role="alert">{error}</span>}
+```
+
+### Keyboard Navigation
+
+```typescript
+const handleKeyDown = (e: React.KeyboardEvent) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    handleClick();
+  }
+};
+
+<div
+  role="button"
+  tabIndex={0}
+  onClick={handleClick}
+  onKeyDown={handleKeyDown}
+>
+  Click me
+</div>
+```
+
+## Summary
+
+Key takeaways:
+
+1. **TypeScript strict mode** - No any types, explicit function signatures
+2. **Naming conventions** - PascalCase components, camelCase functions
+3. **Tailwind CSS** - Organized classes with dark mode support
+4. **Conventional commits** - Clear, descriptive commit messages
+5. **Accessibility** - Semantic HTML, ARIA labels, keyboard navigation
+
+---
+
+Questions about code style? Check the existing codebase for examples or open an issue on GitHub!

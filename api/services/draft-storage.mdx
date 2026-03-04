@@ -1,0 +1,527 @@
+---
+title: "Draft Storage"
+description: "Local storage service for CV draft persistence and sync management"
+---
+
+The Draft Storage service manages CV drafts in browser localStorage, enabling offline editing and sync conflict resolution.
+
+## Overview
+
+The service handles:
+- Draft persistence to localStorage
+- Base version tracking for three-way merge
+- Draft validation and sanitization
+- Content change detection
+- Sync state management
+
+**Source:** `lib/backend/cvDraftStorage.ts:263`
+
+---
+
+## Storage Keys
+
+```typescript
+const STORAGE_KEY = "cv-draft"; // Current draft
+const BASE_KEY = "cv-draft-base"; // Last synced state
+```
+
+---
+
+## Draft Operations
+
+### saveDraft
+
+Saves CV draft to localStorage with timestamp.
+
+```typescript
+function saveDraft(data: CVData): boolean
+```
+
+<ParamField path="data" type="CVData" required>
+  The CV data to save as draft
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if save succeeded, false otherwise
+</ResponseField>
+
+**Behavior:**
+- Serializes CV data with `savedAt` timestamp
+- Stores in localStorage with key `"cv-draft"`
+- Handles storage quota errors gracefully
+
+**DraftData Interface:**
+```typescript
+interface DraftData {
+  data: CVData;
+  savedAt: string; // ISO 8601 timestamp
+}
+```
+
+**Example:**
+```typescript
+import { saveDraft } from '@/lib/backend/cvDraftStorage';
+
+const saved = saveDraft(cvData);
+
+if (saved) {
+  console.log('Draft saved successfully');
+} else {
+  console.error('Failed to save draft - storage quota exceeded?');
+}
+```
+
+**Error Handling:**
+- Returns `false` on storage quota exceeded
+- Returns `false` on serialization errors
+- Logs errors with `[CVDraft]` prefix
+
+---
+
+### loadDraft
+
+Loads CV draft from localStorage with validation.
+
+```typescript
+function loadDraft(): DraftData | null
+```
+
+<ResponseField name="return" type="DraftData | null">
+  Returns draft data with timestamp, or null if no draft exists or validation fails
+</ResponseField>
+
+**Behavior:**
+- Retrieves draft from localStorage
+- Validates data structure using Zod schema
+- Automatically clears invalid drafts
+- Returns null if no draft exists
+
+**Example:**
+```typescript
+import { loadDraft } from '@/lib/backend/cvDraftStorage';
+
+const draft = loadDraft();
+
+if (draft) {
+  console.log('Draft loaded:', draft.savedAt);
+  console.log('Full name:', draft.data.personalInfo.fullName);
+} else {
+  console.log('No draft found or invalid data');
+}
+```
+
+**Validation:**
+- Uses `validateCVData()` from validation service
+- Clears draft if validation fails
+- Returns validated data with defaults filled in
+
+---
+
+### hasDraft
+
+Checks if a draft exists in localStorage.
+
+```typescript
+function hasDraft(): boolean
+```
+
+<ResponseField name="return" type="boolean">
+  Returns true if draft exists, false otherwise
+</ResponseField>
+
+**Example:**
+```typescript
+import { hasDraft } from '@/lib/backend/cvDraftStorage';
+
+if (hasDraft()) {
+  console.log('Draft exists - prompt user to restore');
+} else {
+  console.log('No draft - start fresh');
+}
+```
+
+---
+
+### clearDraft
+
+Clears CV draft from localStorage.
+
+```typescript
+function clearDraft(): boolean
+```
+
+<ResponseField name="return" type="boolean">
+  Returns true if clear succeeded or no draft existed, false on error
+</ResponseField>
+
+**Example:**
+```typescript
+import { clearDraft } from '@/lib/backend/cvDraftStorage';
+
+// After successful cloud save
+await saveCV(userId, cvData);
+clearDraft();
+```
+
+---
+
+## Base Version Operations
+
+Base version tracking enables three-way merge for conflict resolution by storing the last synced state.
+
+### saveBase
+
+Saves base version (last synced state) to localStorage.
+
+```typescript
+function saveBase(data: CVData): boolean
+```
+
+<ParamField path="data" type="CVData" required>
+  The CV data to save as base version
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if save succeeded, false otherwise
+</ResponseField>
+
+**When to Use:**
+- After successful cloud sync (save or load)
+- To track the common ancestor for three-way merge
+- Before making local changes
+
+**Example:**
+```typescript
+import { saveBase } from '@/lib/backend/cvDraftStorage';
+
+// After loading from cloud
+const cloudData = await loadCV(userId);
+if (cloudData) {
+  saveBase(cloudData);
+}
+
+// After saving to cloud
+await saveCV(userId, cvData);
+saveBase(cvData);
+```
+
+---
+
+### loadBase
+
+Loads base version from localStorage with validation.
+
+```typescript
+function loadBase(): BaseData | null
+```
+
+<ResponseField name="return" type="BaseData | null">
+  Returns base data with timestamp, or null if no base exists or validation fails
+</ResponseField>
+
+**BaseData Interface:**
+```typescript
+interface BaseData {
+  data: CVData;
+  savedAt: string; // ISO 8601 timestamp
+}
+```
+
+**Example:**
+```typescript
+import { loadBase } from '@/lib/backend/cvDraftStorage';
+
+const base = loadBase();
+
+if (base) {
+  console.log('Base version from:', base.savedAt);
+  // Use for three-way merge
+}
+```
+
+---
+
+### hasBase
+
+Checks if a base version exists in localStorage.
+
+```typescript
+function hasBase(): boolean
+```
+
+<ResponseField name="return" type="boolean">
+  Returns true if base exists, false otherwise
+</ResponseField>
+
+---
+
+### clearBase
+
+Clears base version from localStorage.
+
+```typescript
+function clearBase(): boolean
+```
+
+<ResponseField name="return" type="boolean">
+  Returns true if clear succeeded or no base existed, false on error
+</ResponseField>
+
+---
+
+### updateBaseAfterSync
+
+Convenience function to update base after successful cloud sync.
+
+```typescript
+function updateBaseAfterSync(data: CVData): boolean
+```
+
+<ParamField path="data" type="CVData" required>
+  The CV data that was just synced
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if update succeeded, false otherwise
+</ResponseField>
+
+**Example:**
+```typescript
+import { updateBaseAfterSync } from '@/lib/backend/cvDraftStorage';
+
+// After successful save
+await saveCV(userId, cvData);
+updateBaseAfterSync(cvData);
+```
+
+---
+
+## Content Analysis
+
+### hasMeaningfulContent
+
+Checks if CV data contains actual user-entered content.
+
+```typescript
+function hasMeaningfulContent(data: CVData): boolean
+```
+
+<ParamField path="data" type="CVData" required>
+  The CV data to check
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if there's actual user-entered data, false if empty/default
+</ResponseField>
+
+**Checks:**
+- Personal info fields (name, email, phone, etc.)
+- Array sections (experience, education, etc.)
+- Non-default references text
+
+**Example:**
+```typescript
+import { hasMeaningfulContent } from '@/lib/backend/cvDraftStorage';
+
+const draft = loadDraft();
+
+if (draft && hasMeaningfulContent(draft.data)) {
+  console.log('Draft contains meaningful content');
+} else {
+  console.log('Draft is empty or default');
+}
+```
+
+**Use Cases:**
+- Deciding whether to prompt draft restoration
+- Validating before save
+- Showing empty state UI
+
+---
+
+### hasDataChanged
+
+Compares two CV data objects to detect meaningful differences.
+
+```typescript
+function hasDataChanged(a: CVData, b: CVData): boolean
+```
+
+<ParamField path="a" type="CVData" required>
+  First CV data object
+</ParamField>
+
+<ParamField path="b" type="CVData" required>
+  Second CV data object
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if data has meaningful differences
+</ResponseField>
+
+**Comparison Logic:**
+- Personal info: Deep JSON comparison
+- Arrays: Length and content comparison
+- Section order: Array comparison
+- Hidden sections: Array comparison
+- References: String comparison
+- Template: String comparison
+
+**Example:**
+```typescript
+import { hasDataChanged, loadDraft, loadBase } from '@/lib/backend/cvDraftStorage';
+
+const draft = loadDraft();
+const base = loadBase();
+
+if (draft && base && hasDataChanged(draft.data, base.data)) {
+  console.log('Draft has unsaved changes');
+} else {
+  console.log('Draft matches synced version');
+}
+```
+
+**Use Cases:**
+- Detecting unsaved changes
+- Conflict detection
+- Auto-save triggers
+- "Unsaved changes" warnings
+
+---
+
+## Merge Operations
+
+### mergeCVData
+
+Deep merges two CV data objects, preferring source values.
+
+```typescript
+function mergeCVData(target: CVData, source: CVData): CVData
+```
+
+<ParamField path="target" type="CVData" required>
+  Target CV data (fallback values)
+</ParamField>
+
+<ParamField path="source" type="CVData" required>
+  Source CV data (preferred values)
+</ParamField>
+
+<ResponseField name="return" type="CVData">
+  Merged CV data with source values taking priority
+</ResponseField>
+
+**Merge Strategy:**
+- Personal info: Field-level merge (source overwrites target)
+- Arrays: Use source if non-empty, otherwise target
+- Section order: Use source if present, otherwise target
+- References: Use source if present, otherwise target
+- Hidden sections: Use source if present, otherwise target
+- Template: Use source if defined, otherwise target
+
+**Example:**
+```typescript
+import { mergeCVData } from '@/lib/backend/cvDraftStorage';
+
+// "Keep local" conflict resolution
+const local = loadDraft()?.data;
+const cloud = await loadCV(userId);
+
+if (local && cloud) {
+  const merged = mergeCVData(cloud, local);
+  await saveCV(userId, merged);
+}
+```
+
+**Use Cases:**
+- "Keep local" conflict resolution
+- Filling missing fields from cloud data
+- Merging partial updates
+
+---
+
+## Sync Workflow Example
+
+```typescript
+import {
+  saveDraft,
+  loadDraft,
+  clearDraft,
+  saveBase,
+  loadBase,
+  hasDataChanged,
+  hasMeaningfulContent
+} from '@/lib/backend/cvDraftStorage';
+import { saveCV, loadCV } from '@/lib/cvService';
+
+// On app load
+const draft = loadDraft();
+const base = loadBase();
+
+if (draft && hasMeaningfulContent(draft.data)) {
+  // Check for changes
+  if (base && hasDataChanged(draft.data, base.data)) {
+    console.log('Local changes detected');
+  }
+  
+  // Load draft into editor
+  setEditorData(draft.data);
+} else {
+  // Load from cloud
+  const cloudData = await loadCV(userId);
+  if (cloudData) {
+    setEditorData(cloudData);
+    saveBase(cloudData);
+  }
+}
+
+// On user edit
+function handleEdit(newData: CVData) {
+  setEditorData(newData);
+  saveDraft(newData);
+}
+
+// On save button
+async function handleSave() {
+  const data = getEditorData();
+  await saveCV(userId, data);
+  saveBase(data);
+  clearDraft();
+}
+```
+
+---
+
+## Error Handling
+
+All functions handle errors gracefully:
+
+- Storage quota exceeded
+- Invalid JSON in localStorage
+- Validation failures
+- Missing localStorage API
+
+**Best Practices:**
+- Always check return values
+- Handle `null` returns from load functions
+- Validate before using loaded data
+- Clear invalid drafts automatically
+
+```typescript
+try {
+  const saved = saveDraft(data);
+  if (!saved) {
+    // Handle storage error
+    console.warn('Could not save draft - storage full?');
+  }
+} catch (error) {
+  console.error('Unexpected error:', error);
+}
+```
+
+---
+
+## Related Services
+
+- [CV Service](/api/services/cv-service) - Cloud CV data management
+- [Validation](/api/services/validation) - CV data validation

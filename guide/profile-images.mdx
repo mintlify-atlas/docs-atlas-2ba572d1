@@ -1,0 +1,377 @@
+---
+title: Profile Images
+description: Upload, crop, and optimize profile photos for your resume with CV Builder
+---
+
+A professional profile photo can make your resume stand out. CV Builder includes a powerful image upload and cropping tool that automatically optimizes your photos for the best quality and file size.
+
+## Adding a Profile Image
+
+<Steps>
+  <Step title="Navigate to Personal Details">
+    Click on "Personal Details" in the section sidebar.
+  </Step>
+  
+  <Step title="Find the Profile Image Upload">
+    Scroll to the profile image section—you'll see a circular placeholder orb.
+  </Step>
+  
+  <Step title="Upload Your Photo">
+    You can upload an image in two ways:
+    
+    **Click to Upload:**
+    - Click the upload orb
+    - Select an image file from your computer
+    
+    **Drag and Drop:**
+    - Drag an image file from your file browser
+    - Drop it onto the upload orb
+    
+    <Screenshot src="/images/profile-upload.png" alt="Profile image upload area" />
+  </Step>
+  
+  <Step title="Crop Your Image">
+    After selecting an image, the crop editor opens:
+    - Adjust the crop area by dragging
+    - Use the zoom slider to resize the image
+    - The crop is always square (1:1 aspect ratio)
+    - Preview shows exactly what will be saved
+    
+    <Screenshot src="/images/crop-editor.png" alt="Image crop editor" />
+  </Step>
+  
+  <Step title="Apply or Skip Cropping">
+    You have two options:
+    - **Crop & Apply** - Use the cropped image (recommended)
+    - **Use Original** - Skip cropping and use the full image
+  </Step>
+  
+  <Step title="See It in Your Resume">
+    The profile image appears in the live preview and will be included in PDF exports.
+  </Step>
+</Steps>
+
+## Supported File Formats
+
+CV Builder accepts the following image formats:
+- **JPEG** (.jpg, .jpeg)
+- **PNG** (.png)
+- **WebP** (.webp)
+
+<Warning>
+Other formats like GIF, SVG, HEIC, or BMP are not supported. Convert your image to JPEG or PNG first.
+</Warning>
+
+## File Size and Dimensions
+
+**Restrictions:**
+- Maximum file size: 5 MB (enforced by validation)
+- Minimum dimensions: No strict minimum, but higher resolution is better
+- Recommended: At least 400×400 pixels for sharp output
+
+**Optimization:**
+CV Builder automatically optimizes your image:
+- Resizes to 400×400 pixels (optimal for resumes)
+- Compresses to reduce file size
+- Converts to high-quality JPEG format
+- Embeds as base64 in your resume data
+
+<Tip>
+Use a high-resolution image (800×800 or larger). The cropping tool will resize it to the perfect dimensions while maintaining quality.
+</Tip>
+
+## Image Upload Component
+
+The profile image upload uses the `ProfileImageUpload` component:
+
+```tsx
+interface ProfileImageUploadProps {
+  value?: string;              // Current image (base64)
+  onChange: (value: string) => void;  // Called when image changes
+  onError?: (error: string) => void;  // Error handler
+  disabled?: boolean;          // Disable interactions
+}
+```
+
+### Upload States
+
+```typescript
+type UploadStatus = 
+  | "idle"       // No activity
+  | "dragging"   // User is dragging file over orb
+  | "uploading"  // Processing and optimizing image
+  | "cropping"   // Crop editor is open
+  | "success"    // Upload completed successfully
+  | "error";     // Upload failed
+```
+
+## Image Cropping Tool
+
+CV Builder uses **react-easy-crop** for professional image cropping:
+
+```tsx
+<Cropper
+  image={selectedImageSrc}
+  crop={crop}
+  zoom={zoom}
+  aspect={1}  // Square crop (1:1 ratio)
+  onCropChange={setCrop}
+  onZoomChange={setZoom}
+  onCropComplete={onCropComplete}
+  zoomWithScroll
+  showGrid={true}
+  cropShape="rect"
+/>
+```
+
+### Crop Controls
+
+- **Pan** - Click and drag the image to reposition
+- **Zoom slider** - Adjust zoom level from 1× to 3×
+- **Zoom percentage** - Displays current zoom level
+- **Mouse wheel** - Scroll to zoom in/out (when enabled)
+
+<Screenshot src="/images/crop-controls.png" alt="Image crop controls" />
+
+### Crop Area
+
+The crop area is defined by pixel coordinates:
+
+```typescript
+interface Area {
+  x: number;       // Left position in pixels
+  y: number;       // Top position in pixels
+  width: number;   // Width in pixels
+  height: number;  // Height in pixels
+}
+```
+
+## Image Validation
+
+Before uploading, images are validated:
+
+```typescript
+function validateProfileImageFile(file: File): string | null {
+  // Check file type
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    return 'Invalid file type. Please upload a JPEG, PNG, or WebP image.';
+  }
+
+  // Check file size (5 MB limit)
+  const maxSize = 5 * 1024 * 1024; // 5 MB in bytes
+  if (file.size > maxSize) {
+    return 'File size exceeds 5 MB. Please choose a smaller image.';
+  }
+
+  return null; // No errors
+}
+```
+
+## Image Optimization Process
+
+When you upload an image, CV Builder:
+
+1. **Validates** the file type and size
+2. **Loads** the image into the crop editor
+3. **Crops** (if you choose "Crop & Apply")
+4. **Resizes** to 400×400 pixels
+5. **Compresses** to optimize quality vs. size
+6. **Converts** to base64 encoding
+7. **Saves** in your resume data
+
+```typescript
+async function optimizeProfileImage(file: File, cropArea?: Area): Promise<Blob> {
+  // Create image element
+  const img = await loadImage(file);
+  
+  // Create canvas for processing
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  // Set output dimensions
+  canvas.width = 400;
+  canvas.height = 400;
+  
+  // Apply crop if specified
+  if (cropArea) {
+    ctx.drawImage(
+      img,
+      cropArea.x, cropArea.y, cropArea.width, cropArea.height,  // Source
+      0, 0, 400, 400  // Destination
+    );
+  } else {
+    // No crop - resize entire image
+    ctx.drawImage(img, 0, 0, 400, 400);
+  }
+  
+  // Convert to optimized blob
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      (blob) => resolve(blob),
+      'image/jpeg',  // Output format
+      0.92           // Quality (92%)
+    );
+  });
+}
+```
+
+## Base64 Encoding
+
+Images are stored as base64 strings in your resume:
+
+```typescript
+interface PersonalInfo {
+  // ... other fields
+  profileImageUrl?: string;  // Base64-encoded image
+}
+```
+
+**Example base64 string:**
+```
+data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEA...
+```
+
+### Converting to Base64
+
+```typescript
+async function toBase64ProfileImage(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      resolve(reader.result as string);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+```
+
+## Editing a Profile Image
+
+To change an existing profile image:
+
+<Steps>
+  <Step title="Hover Over the Image">
+    Move your mouse over the profile image orb.
+  </Step>
+  
+  <Step title="Click Edit Icon">
+    An overlay appears with two buttons:
+    - **Edit** (pencil icon) - Replace the image
+    - **Delete** (trash icon) - Remove the image
+  </Step>
+  
+  <Step title="Upload New Image">
+    Click Edit and follow the upload process again.
+  </Step>
+</Steps>
+
+<Screenshot src="/images/edit-profile-image.png" alt="Editing a profile image" />
+
+## Removing a Profile Image
+
+To delete your profile image:
+
+1. Hover over the image in the Personal Details section
+2. Click the trash icon in the overlay
+3. The image is removed immediately
+4. The upload orb returns to its empty state
+
+<Note>
+Removing a profile image doesn't delete the file—it simply removes the reference from your resume. You can upload a new image anytime.
+</Note>
+
+## Best Practices for Profile Photos
+
+<Tip>
+**Professional Photo Guidelines:**
+
+1. **Use a high-quality image** - At least 800×800 pixels
+2. **Professional attire** - Dress appropriately for your industry
+3. **Solid background** - Avoid busy or distracting backgrounds
+4. **Good lighting** - Natural light works best
+5. **Face forward** - Look directly at the camera
+6. **Smile naturally** - Appear approachable and confident
+7. **Recent photo** - Use a current photo that looks like you
+8. **Centered composition** - Face should be centered in the frame
+9. **No filters** - Keep it natural and professional
+10. **High contrast** - Ensure your face stands out from the background
+</Tip>
+
+## Accessibility
+
+The profile image upload is fully accessible:
+
+- **Keyboard navigation** - Use Tab and Enter to interact
+- **Screen reader support** - All actions have ARIA labels
+- **Alt text** - Images include descriptive alt attributes
+- **Focus indicators** - Clear visual focus states
+
+**ARIA Labels:**
+```tsx
+aria-label="Upload profile photo"
+aria-label="Change profile photo"
+aria-label="Remove photo"
+aria-label="Edit photo"
+```
+
+## Common Issues
+
+**Image upload fails?**
+- Check file format (JPEG, PNG, or WebP only)
+- Verify file size is under 5 MB
+- Try a different image
+- Check browser console for errors
+
+**Crop editor doesn't open?**
+- Ensure JavaScript is enabled
+- Try refreshing the page
+- Check if your browser supports HTML5 Canvas
+
+**Image appears blurry?**
+- Upload a higher-resolution image
+- Avoid zooming in too much during cropping
+- Use a source image larger than 400×400 pixels
+
+**Image doesn't show in PDF?**
+- Verify the image uploaded successfully
+- Check that Personal Details section is not hidden
+- Try re-uploading the image
+- Ensure PDF generation completed without errors
+
+## Mobile Support
+
+Profile image upload works on mobile devices:
+- **Touch support** - Tap to upload, pinch to zoom while cropping
+- **Camera access** - Use device camera to take a photo (when supported)
+- **Mobile-optimized UI** - Responsive design for small screens
+
+<Note>
+On mobile, the crop editor is optimized for touch gestures. Use one finger to pan and two fingers to zoom the image.
+</Note>
+
+## Storage Considerations
+
+Profile images are stored as base64 in your resume data:
+
+**Advantages:**
+- No separate file hosting required
+- Image is embedded directly in the resume
+- Works offline once loaded
+- Included in version snapshots
+
+**Considerations:**
+- Base64 increases data size by ~33%
+- Optimized to 400×400 keeps size reasonable
+- Typical size: 30-50 KB after optimization
+
+<Tip>
+The automatic optimization ensures your resume data stays lightweight while maintaining excellent image quality.
+</Tip>
+
+## Next Steps
+
+- [Complete your Personal Details](/guide/creating-resume) section
+- [Manage section visibility](/guide/managing-sections) to control where the image appears
+- [Save versions](/guide/managing-versions) with different profile photos for different applications

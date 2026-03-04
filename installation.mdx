@@ -1,0 +1,769 @@
+---
+title: Installation
+description: Complete installation guide with prerequisites, setup steps, and troubleshooting
+---
+
+# Installation Guide
+
+This comprehensive guide covers everything you need to install and configure CV Builder for development or production use.
+
+## Prerequisites
+
+Before you begin, ensure your development environment meets these requirements:
+
+### Required
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    **Version 18.17 or later**
+    
+    Check your version:
+    ```bash
+    node --version
+    ```
+    
+    Download from [nodejs.org](https://nodejs.org/)
+  </Card>
+
+  <Card title="Package Manager" icon="box">
+    **pnpm** (recommended), npm, or yarn
+    
+    Check if installed:
+    ```bash
+    pnpm --version
+    ```
+    
+    Install pnpm:
+    ```bash
+    npm install -g pnpm
+    ```
+  </Card>
+</CardGroup>
+
+### Optional
+
+<CardGroup cols={2}>
+  <Card title="Firebase Project" icon="fire">
+    Required for cloud sync, authentication, and version control features.
+    
+    Create at [console.firebase.google.com](https://console.firebase.google.com/)
+  </Card>
+
+  <Card title="Git" icon="git">
+    For version control and cloning the repository.
+    
+    Download from [git-scm.com](https://git-scm.com/)
+  </Card>
+</CardGroup>
+
+### System Requirements
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| Node.js | 18.17.x | 20.x or later |
+| RAM | 4 GB | 8 GB or more |
+| Disk Space | 500 MB | 1 GB |
+| OS | Windows 10, macOS 10.15, Ubuntu 20.04 | Latest versions |
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Get the source code from GitHub:
+
+    ```bash
+    git clone https://github.com/tariqahmaad/CV-Builder.git
+    cd CV-Builder
+    ```
+
+    **Alternative: Download ZIP**
+    
+    If you don't have Git installed:
+    1. Visit [github.com/tariqahmaad/CV-Builder](https://github.com/tariqahmaad/CV-Builder)
+    2. Click **Code** → **Download ZIP**
+    3. Extract the archive
+    4. Navigate to the extracted folder in your terminal
+
+    <Info>
+      The repository uses the main branch by default. No need to checkout specific branches for stable releases.
+    </Info>
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required npm packages:
+
+    <CodeGroup>
+    ```bash pnpm (Recommended)
+    pnpm install
+    ```
+
+    ```bash npm
+    npm install
+    ```
+
+    ```bash yarn
+    yarn install
+    ```
+    </CodeGroup>
+
+    This command installs dependencies from `package.json`:
+
+    ```json package.json (excerpt)
+    {
+      "dependencies": {
+        "next": "16.1.6",
+        "react": "19.2.3",
+        "react-dom": "19.2.3",
+        "typescript": "^5",
+        "firebase": "^12.8.0",
+        "tailwindcss": "^4",
+        "@react-pdf/renderer": "^4.3.2",
+        "react-hook-form": "^7.71.1",
+        "zod": "^4.3.6",
+        "framer-motion": "^12.29.2",
+        "@google/generative-ai": "^0.24.1",
+        "lucide-react": "^0.563.0"
+      },
+      "devDependencies": {
+        "@tailwindcss/postcss": "^4",
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "eslint": "^9",
+        "eslint-config-next": "16.1.6"
+      }
+    }
+    ```
+
+    **What gets installed:**
+    - **Core Framework**: Next.js 16.1.6 with React 19.2.3
+    - **Backend**: Firebase 12.8.0 for auth and database
+    - **Forms**: React Hook Form + Zod validation
+    - **PDF**: @react-pdf/renderer for exports
+    - **Styling**: Tailwind CSS 4.x
+    - **AI**: Google Generative AI for assistance
+    - **Animations**: Framer Motion
+    - **Icons**: Lucide React
+
+    <Warning>
+      Installation may take 2-5 minutes depending on your internet speed and system performance.
+    </Warning>
+  </Step>
+
+  <Step title="Configure Environment Variables (Optional)">
+    To enable Firebase features, create a `.env.local` file:
+
+    ```bash
+    touch .env.local
+    ```
+
+    Add your Firebase configuration:
+
+    ```bash .env.local
+    # Firebase Configuration
+    NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key_here
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+    NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
+    ```
+
+    **Where to find these values:**
+
+    1. Go to [Firebase Console](https://console.firebase.google.com/)
+    2. Select or create your project
+    3. Click the gear icon → **Project settings**
+    4. Scroll to **Your apps** section
+    5. Click the web app icon (`</>`) or create a new web app
+    6. Copy the config values from the `firebaseConfig` object
+
+    These environment variables are loaded in `lib/firebase.ts`:
+
+    ```typescript lib/firebase.ts
+    import { initializeApp, getApps, getApp } from "firebase/app";
+    import { getAuth } from "firebase/auth";
+    import { getFirestore } from "firebase/firestore";
+
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    };
+
+    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+    export const auth = getAuth(app);
+    export const db = getFirestore(app);
+    export default app;
+    ```
+
+    <Note>
+      **Without Firebase configuration**, the app runs in **Guest Mode only**. All features work except authentication and cloud sync.
+    </Note>
+  </Step>
+
+  <Step title="Set Up Firebase (Optional)">
+    If you're using Firebase, configure the required services:
+
+    ### Authentication Setup
+
+    1. In Firebase Console, go to **Build** → **Authentication**
+    2. Click **Get started**
+    3. Enable **Email/Password** sign-in method
+    4. (Optional) Enable **Password reset** emails
+
+    ### Firestore Database Setup
+
+    1. Go to **Build** → **Firestore Database**
+    2. Click **Create database**
+    3. Select **Start in production mode**
+    4. Choose your preferred location (select closest to your users)
+    5. Click **Enable**
+
+    **Firestore Security Rules:**
+
+    After creating the database, update the security rules:
+
+    ```javascript firestore.rules
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        // CV documents - users can only access their own
+        match /cvs/{userId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+        
+        // CV versions - users can only access their own
+        match /versions/{versionId} {
+          allow read, write: if request.auth != null && 
+            resource.data.userId == request.auth.uid;
+        }
+        
+        // CV backups - users can only access their own
+        match /backups/{backupId} {
+          allow read, write: if request.auth != null && 
+            resource.data.userId == request.auth.uid;
+        }
+      }
+    }
+    ```
+
+    ### Storage Setup (for profile images)
+
+    1. Go to **Build** → **Storage**
+    2. Click **Get started**
+    3. Start in **production mode**
+    4. Click **Done**
+
+    **Storage Security Rules:**
+
+    ```javascript storage.rules
+    rules_version = '2';
+    service firebase.storage {
+      match /b/{bucket}/o {
+        match /profile-images/{userId}/{imageId} {
+          allow read: if true;
+          allow write: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+    }
+    ```
+
+    <Warning>
+      Always use proper security rules in production to prevent unauthorized access to user data.
+    </Warning>
+  </Step>
+
+  <Step title="Start Development Server">
+    Launch the Next.js development server:
+
+    ```bash
+    pnpm dev
+    # or npm run dev / yarn dev
+    ```
+
+    **Expected output:**
+
+    ```
+    ▲ Next.js 16.1.6
+    - Local:        http://localhost:3000
+    - Network:      http://192.168.1.100:3000
+
+    ✓ Ready in 2.1s
+    ```
+
+    <Success>
+      Open [http://localhost:3000](http://localhost:3000) in your browser. The CV Builder landing page should appear.
+    </Success>
+
+    **Available Scripts:**
+
+    ```json package.json (scripts)
+    {
+      "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint"
+      }
+    }
+    ```
+
+    | Command | Description |
+    |---------|-------------|
+    | `pnpm dev` | Start development server with hot reload |
+    | `pnpm build` | Create production build |
+    | `pnpm start` | Start production server (after build) |
+    | `pnpm lint` | Run ESLint to check code quality |
+  </Step>
+
+  <Step title="Verify Installation">
+    Test that everything works:
+
+    <Tabs>
+      <Tab title="Basic Features">
+        1. Navigate to [http://localhost:3000](http://localhost:3000)
+        2. Click **"Start Building"**
+        3. Fill in the personal information form
+        4. Verify the preview updates in real-time
+        5. Try exporting a PDF
+
+        <Success>
+          If you can see the form, preview, and export PDF, basic features are working correctly.
+        </Success>
+      </Tab>
+
+      <Tab title="Firebase Features" >
+        If you configured Firebase:
+
+        1. Click **"Sign In"** in the navigation
+        2. Create a new account
+        3. Verify you receive a verification email (if enabled)
+        4. Create a resume in the editor
+        5. Save a version from the Versions menu
+        6. Check that data appears in Firestore Console
+
+        <Success>
+          If authentication and version saving work, Firebase is configured correctly.
+        </Success>
+      </Tab>
+
+      <Tab title="Template System">
+        1. Go to the editor at [http://localhost:3000/editor](http://localhost:3000/editor)
+        2. Click the template dropdown in the header
+        3. Switch between templates:
+           - **Default**
+           - **Rhyhorn**
+           - **Nexus**
+        4. Verify the preview updates with the selected template
+
+        <Success>
+          All three templates should render correctly with your data.
+        </Success>
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
+
+## Directory Structure
+
+After installation, your project structure should look like this:
+
+```
+CV-Builder/
+├── .git/                   # Git version control
+├── .next/                  # Next.js build output (generated)
+├── node_modules/           # Installed dependencies (generated)
+├── app/                    # Next.js App Router pages
+│   ├── api/                # API routes
+│   ├── editor/             # Resume editor page
+│   │   └── page.tsx        # Main editor component
+│   ├── resumes/            # Resume list page
+│   ├── templates/          # Template preview page
+│   ├── layout.tsx          # Root layout
+│   ├── page.tsx            # Landing page
+│   └── globals.css         # Global styles
+├── components/             # React components
+│   ├── forms/              # Form section components
+│   ├── home/               # Landing page sections
+│   ├── preview/            # Live preview & PDF components
+│   ├── templates/          # Template implementations
+│   │   ├── nexus/          # Nexus template
+│   │   ├── rhyhorn/        # Rhyhorn template
+│   │   └── types.ts        # Template type definitions
+│   ├── ui/                 # Reusable UI primitives
+│   └── cv-builder.tsx      # Main CV builder component
+├── hooks/                  # Custom React hooks
+├── lib/                    # Core library & utilities
+│   ├── backend/            # Backend service modules
+│   │   ├── cvRepository.ts # Firestore operations
+│   │   ├── cvService.ts    # Business logic
+│   │   ├── cvValidation.ts # Zod schemas
+│   │   ├── cvDraftStorage.ts # LocalStorage management
+│   │   └── cvThreeWayMerge.ts # Conflict resolution
+│   ├── AuthContext.tsx     # Auth state management
+│   ├── firebase.ts         # Firebase initialization
+│   ├── types.ts            # TypeScript definitions
+│   └── utils.ts            # Utility functions
+├── public/                 # Static assets
+│   ├── icon.svg            # App icon
+│   └── apple-icon.svg      # Apple touch icon
+├── .env.local              # Environment variables (you create this)
+├── .gitignore              # Git ignore rules
+├── eslint.config.mjs       # ESLint configuration
+├── next.config.ts          # Next.js configuration
+├── package.json            # Project dependencies
+├── pnpm-lock.yaml          # Lock file (pnpm)
+├── postcss.config.mjs      # PostCSS configuration
+├── README.md               # Project documentation
+└── tsconfig.json           # TypeScript configuration
+```
+
+<Info>
+  The `.next/` and `node_modules/` directories are automatically generated and should never be committed to version control.
+</Info>
+
+## Configuration Files
+
+### next.config.ts
+
+Next.js configuration with React Compiler enabled:
+
+```typescript next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  reactCompiler: true, // Enable React Compiler for optimization
+};
+
+export default nextConfig;
+```
+
+### tsconfig.json
+
+TypeScript configuration for strict type checking:
+
+```json tsconfig.json (excerpt)
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}
+```
+
+<Note>
+  The `@/*` path alias allows you to import from project root, e.g., `import { CVData } from '@/lib/types'`
+</Note>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Error: Node version too old">
+    **Problem:**
+    ```
+    error: The engine "node" is incompatible with this module.
+    Expected version ">=18.17.0". Got "16.14.0"
+    ```
+
+    **Solution:**
+    
+    Upgrade Node.js to version 18.17 or later:
+    
+    1. Download from [nodejs.org](https://nodejs.org/)
+    2. Or use a version manager like [nvm](https://github.com/nvm-sh/nvm):
+    
+    ```bash
+    nvm install 20
+    nvm use 20
+    ```
+    
+    Verify the version:
+    ```bash
+    node --version
+    # Should show v18.17.0 or higher
+    ```
+  </Accordion>
+
+  <Accordion title="Error: pnpm not found">
+    **Problem:**
+    ```
+    bash: pnpm: command not found
+    ```
+
+    **Solution:**
+    
+    Install pnpm globally:
+    
+    ```bash
+    npm install -g pnpm
+    ```
+    
+    Or use npm/yarn instead:
+    ```bash
+    npm install
+    npm run dev
+    ```
+  </Accordion>
+
+  <Accordion title="Error: Port 3000 already in use">
+    **Problem:**
+    ```
+    Error: listen EADDRINUSE: address already in use :::3000
+    ```
+
+    **Solution:**
+    
+    Either kill the process using port 3000:
+    
+    <CodeGroup>
+    ```bash macOS/Linux
+    lsof -ti:3000 | xargs kill -9
+    ```
+    
+    ```bash Windows
+    netstat -ano | findstr :3000
+    taskkill /PID <PID> /F
+    ```
+    </CodeGroup>
+    
+    Or run on a different port:
+    ```bash
+    pnpm dev -- -p 3001
+    ```
+  </Accordion>
+
+  <Accordion title="Error: Firebase configuration missing">
+    **Problem:**
+    
+    Sign-in button doesn't work, or you see Firebase errors in console.
+
+    **Solution:**
+    
+    1. Ensure `.env.local` exists with all Firebase variables
+    2. Restart the dev server after creating/modifying `.env.local`
+    3. Verify all 7 environment variables are set (not empty strings)
+    4. Check for typos in variable names (must be exactly as shown)
+    
+    ```bash
+    # Check if variables are loaded
+    cat .env.local
+    ```
+    
+    <Info>
+      Remember: Changes to `.env.local` require a server restart to take effect.
+    </Info>
+  </Accordion>
+
+  <Accordion title="Error: Module not found during build">
+    **Problem:**
+    ```
+    Module not found: Can't resolve '@/components/...''
+    ```
+
+    **Solution:**
+    
+    1. Delete `node_modules` and lock file:
+    
+    ```bash
+    rm -rf node_modules pnpm-lock.yaml
+    ```
+    
+    2. Clear Next.js cache:
+    
+    ```bash
+    rm -rf .next
+    ```
+    
+    3. Reinstall dependencies:
+    
+    ```bash
+    pnpm install
+    ```
+    
+    4. Restart dev server:
+    
+    ```bash
+    pnpm dev
+    ```
+  </Accordion>
+
+  <Accordion title="PDF export not working">
+    **Problem:**
+    
+    PDF export button doesn't download a file, or shows an error.
+
+    **Solution:**
+    
+    1. Check browser console for errors
+    2. Ensure `@react-pdf/renderer` is installed:
+    
+    ```bash
+    pnpm list @react-pdf/renderer
+    # Should show @react-pdf/renderer 4.3.2
+    ```
+    
+    3. If missing, reinstall:
+    
+    ```bash
+    pnpm install @react-pdf/renderer@^4.3.2
+    ```
+    
+    4. Clear browser cache and try again
+    5. Try in an incognito/private window to rule out extensions
+  </Accordion>
+
+  <Accordion title="Firestore permission denied">
+    **Problem:**
+    ```
+    FirebaseError: Missing or insufficient permissions
+    ```
+
+    **Solution:**
+    
+    1. Check Firebase Console → Firestore Database → Rules
+    2. Ensure rules allow authenticated users to access their own data
+    3. Verify you're signed in (check auth state)
+    4. Update security rules if needed (see Step 4 above)
+    
+    **Temporary test rules (development only):**
+    
+    ```javascript
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /{document=**} {
+          allow read, write: if request.auth != null;
+        }
+      }
+    }
+    ```
+    
+    <Warning>
+      Never use test rules in production! Always restrict access to user-owned documents.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="TypeScript errors in IDE">
+    **Problem:**
+    
+    Red squiggly lines everywhere, or "Cannot find module" errors.
+
+    **Solution:**
+    
+    1. Ensure TypeScript is installed:
+    
+    ```bash
+    pnpm list typescript
+    ```
+    
+    2. Reload your IDE/editor window:
+       - VSCode: `Ctrl+Shift+P` → "Reload Window"
+       - WebStorm: File → Invalidate Caches / Restart
+    
+    3. Check `tsconfig.json` exists and is valid
+    
+    4. Install missing type definitions:
+    
+    ```bash
+    pnpm install -D @types/node @types/react @types/react-dom
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Production Build
+
+Before deploying, test the production build locally:
+
+<Steps>
+  <Step title="Create Production Build">
+    ```bash
+    pnpm build
+    ```
+
+    This command:
+    1. Compiles TypeScript
+    2. Bundles JavaScript/CSS
+    3. Optimizes images and assets
+    4. Generates static pages where possible
+
+    **Expected output:**
+    ```
+    ✓ Compiled successfully
+    ✓ Collecting page data
+    ✓ Generating static pages (5/5)
+    ✓ Finalizing page optimization
+
+    Route (app)                              Size     First Load JS
+    ┌ ○ /                                    1.2 kB          120 kB
+    ├ ○ /editor                              892 B           135 kB
+    └ ○ /resumes                             456 B           118 kB
+
+    ○  (Static)  prerendered as static content
+    ```
+  </Step>
+
+  <Step title="Start Production Server">
+    ```bash
+    pnpm start
+    ```
+
+    Test the production build at [http://localhost:3000](http://localhost:3000)
+  </Step>
+
+  <Step title="Deploy">
+    For production deployment, refer to Next.js documentation for deploying to:
+    - Vercel (recommended)
+    - Netlify
+    - Docker
+    - Self-hosted VPS
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first resume in 5 minutes
+  </Card>
+  <Card title="Templates" icon="paintbrush" href="/features/templates">
+    Learn about available templates
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/services/cv-service">
+    Explore the CV service API
+  </Card>
+  <Card title="Contributing" icon="code-branch" href="/contributing/setup">
+    Contribute to the project
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you encounter issues not covered here:
+
+- **GitHub Issues**: [github.com/tariqahmaad/CV-Builder/issues](https://github.com/tariqahmaad/CV-Builder/issues)
+- **Discussions**: [github.com/tariqahmaad/CV-Builder/discussions](https://github.com/tariqahmaad/CV-Builder/discussions)
+- **Email**: Contact the maintainer via GitHub profile
+
+<Success>
+  Installation complete! You're ready to start building professional resumes.
+</Success>

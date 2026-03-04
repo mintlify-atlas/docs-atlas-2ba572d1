@@ -1,0 +1,226 @@
+---
+title: Introduction
+description: Welcome to CV Builder - A modern, privacy-first resume builder with real-time preview and version control
+---
+
+# Introduction to CV Builder
+
+CV Builder is a sophisticated, full-stack resume building application that empowers users to create professional, ATS-friendly resumes without compromising on privacy. Built with modern web technologies, it offers a seamless form-based editing experience with real-time preview, multiple template options, and robust version control.
+
+## Why CV Builder?
+
+<CardGroup cols={2}>
+  <Card title="Privacy-First" icon="shield-check">
+    Work entirely in guest mode with local storage persistence, or sync to the cloud when ready
+  </Card>
+  <Card title="Professional Templates" icon="palette">
+    Choose from multiple professionally designed templates optimized for ATS systems
+  </Card>
+  <Card title="Version Control" icon="clock-rotate-left">
+    Save, manage, and restore multiple resume versions with metadata and tags
+  </Card>
+  <Card title="Auto-Save" icon="floppy-disk">
+    Never lose progress with automatic draft persistence and conflict resolution
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Core Functionality
+
+<AccordionGroup>
+  <Accordion title="Smart Editor">
+    Intuitive form-based interface with real-time preview. No design skills required. Edit your resume sections with a clean, organized form layout while watching changes appear instantly in the preview panel.
+  </Accordion>
+
+  <Accordion title="Multiple Templates">
+    Choose from three professionally designed templates:
+    - **Default**: Clean, modern layout with traditional structure
+    - **Rhyhorn**: Bold, contemporary design with visual impact
+    - **Nexus**: Minimalist, ATS-optimized format
+  </Accordion>
+
+  <Accordion title="PDF Export">
+    Generate ATS-friendly PDFs with proper A4 formatting and professional spacing using `@react-pdf/renderer` for production-quality output.
+  </Accordion>
+
+  <Accordion title="Version Control">
+    Save named versions with descriptions and tags. Restore any previous version instantly with automatic backup before restore operations.
+  </Accordion>
+</AccordionGroup>
+
+### Resume Sections
+
+CV Builder supports comprehensive resume sections to showcase your professional profile:
+
+- **Personal Information**: Name, contact details, professional summary, social links
+- **Experience**: Work history with company, role, dates, and descriptions
+- **Education**: Academic background with degree details
+- **Projects**: Portfolio projects with tech stack highlights
+- **Achievements**: Certifications, awards, and recognitions
+- **Languages**: Language proficiency levels
+- **Skills**: Technical and professional skill categories
+- **References**: Reference statements
+
+<Note>
+  All sections are reorderable and can be hidden from the final resume. The personal information section is always displayed first.
+</Note>
+
+## Architecture Overview
+
+### Tech Stack
+
+CV Builder is built with cutting-edge technologies for optimal performance and developer experience:
+
+<CodeGroup>
+```json package.json
+{
+  "dependencies": {
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "typescript": "^5",
+    "firebase": "^12.8.0",
+    "tailwindcss": "^4",
+    "@react-pdf/renderer": "^4.3.2",
+    "react-hook-form": "^7.71.1",
+    "zod": "^4.3.6",
+    "framer-motion": "^12.29.2"
+  }
+}
+```
+</CodeGroup>
+
+#### Frontend Stack
+
+| Technology | Version | Purpose |
+|------------|---------|----------|
+| Next.js | 16.1.6 | React framework with App Router |
+| React | 19.2.3 | UI library with React Compiler |
+| TypeScript | 5.x | Type-safe development |
+| Tailwind CSS | 4.x | Utility-first styling |
+| Framer Motion | 12.29.2 | Animations and transitions |
+
+#### Forms & Validation
+
+| Technology | Version | Purpose |
+|------------|---------|----------|
+| React Hook Form | 7.71.1 | Form state management |
+| Zod | 4.3.6 | Schema validation |
+
+#### Backend & Services
+
+| Technology | Version | Purpose |
+|------------|---------|----------|
+| Firebase | 12.8.0 | Authentication & Firestore database |
+| @react-pdf/renderer | 4.3.2 | PDF generation |
+| @google/generative-ai | 0.24.1 | AI-powered assistance |
+
+### Project Structure
+
+```
+CV-Builder/
+├── app/                    # Next.js App Router pages
+│   ├── api/                # API routes
+│   ├── editor/             # Resume editor page
+│   ├── resumes/            # Resume list page
+│   ├── templates/          # Template preview page
+│   └── page.tsx            # Landing page
+├── components/             # React components
+│   ├── forms/              # Form section components
+│   ├── home/               # Landing page sections
+│   ├── preview/            # Live preview & PDF
+│   ├── templates/          # Template system
+│   └── ui/                 # Reusable UI primitives
+├── hooks/                  # Custom React hooks
+├── lib/                    # Core library & utilities
+│   ├── backend/            # Backend services
+│   ├── firebase.ts         # Firebase configuration
+│   ├── cvService.ts        # CV CRUD operations
+│   └── types.ts            # TypeScript type definitions
+├── public/                 # Static assets
+└── ...config files
+```
+
+### Data Model
+
+The core data structure is defined in `lib/types.ts`:
+
+```typescript lib/types.ts
+export interface CVData {
+  personalInfo: PersonalInfo;
+  experience: Experience[];
+  education: Education[];
+  projects: Project[];
+  achievements: Achievement[];
+  languages: Language[];
+  skills: Skill[];
+  sectionOrder: SectionId[];
+  references: string;
+  hiddenSections: SectionId[];
+  template?: TemplateId;
+}
+
+export type TemplateId = 'default' | 'rhyhorn' | 'nexus';
+
+export interface CVVersion {
+  id: string;
+  userId: string;
+  data: CVData;
+  versionName: string;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  isAutoSave: boolean;
+}
+```
+
+<Info>
+  The `CVData` interface is the foundation of the entire application. All form inputs, preview rendering, PDF generation, and database operations work with this structure.
+</Info>
+
+## User Experience
+
+### Guest Mode
+
+CV Builder offers full functionality without authentication:
+- All data stored in browser `localStorage`
+- No account required to create resumes
+- Instant start - no signup friction
+- Perfect for quick resume creation or privacy-conscious users
+
+<Warning>
+  Guest mode data is stored locally in your browser. Clearing browser data will delete your resumes. Consider signing in to sync your data to the cloud.
+</Warning>
+
+### Authenticated Mode
+
+When signed in with Firebase Authentication:
+- **Cloud Sync**: Your resumes are saved to Firestore
+- **Version Control**: Create and restore named versions
+- **Multi-Device**: Access your resumes from any device
+- **Conflict Resolution**: Smart merging when local drafts conflict with cloud data
+
+### Auto-Save & Conflict Resolution
+
+The application implements intelligent auto-save with three-way merge conflict resolution:
+
+```typescript lib/backend/cvThreeWayMerge.ts
+export interface MergeResult {
+  merged: CVData;
+  conflicts: FieldConflict[];
+  hasConflicts: boolean;
+}
+```
+
+When conflicts are detected between local drafts and cloud data, users are presented with a clear UI to resolve differences field-by-field.
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get from clone to your first resume in 5-10 minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed setup instructions with troubleshooting
+  </Card>
+</CardGroup>

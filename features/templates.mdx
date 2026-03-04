@@ -1,0 +1,350 @@
+---
+title: "Templates"
+description: "Choose from 3 professionally designed resume templates with live preview and PDF export"
+---
+
+## Overview
+
+CV Builder offers 3 professionally designed templates, each optimized for different industries and career stages. All templates support the same data model and can be switched instantly.
+
+## Available Templates
+
+<CardGroup cols={3}>
+  <Card title="Default" icon="file-lines">
+    Classic professional template with navy blue accents
+  </Card>
+  <Card title="Rhyhorn" icon="palette">
+    Modern template with colorful header and clean layout
+  </Card>
+  <Card title="Nexus" icon="layer-group">
+    Two-column design with sidebar for personal details
+  </Card>
+</CardGroup>
+
+## Template Type System
+
+```typescript
+// lib/types.ts:144
+export type TemplateId = 'default' | 'rhyhorn' | 'nexus';
+
+interface CVData {
+  // ...
+  template?: TemplateId;
+}
+```
+
+The template is stored as part of the CV data and syncs across devices.
+
+## Template Switching
+
+Users can switch templates using the template selector in the preview panel:
+
+```tsx
+// components/cv-builder.tsx:924-927
+<TemplateSelector
+  currentTemplate={currentTemplate}
+  onTemplateChange={(template) => 
+    methods.setValue("template", template, { shouldDirty: true })
+  }
+/>
+```
+
+Template changes trigger:
+1. Immediate preview update
+2. Auto-save to localStorage
+3. URL parameter update for bookmarking
+
+### URL Synchronization
+
+The selected template is reflected in the URL:
+
+```typescript
+// components/cv-builder.tsx:107-124
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const normalizedTemplate: TemplateId = currentTemplate ?? "default";
+
+  if (previousTemplate.current === null) {
+    previousTemplate.current = normalizedTemplate;
+    return;
+  }
+
+  if (normalizedTemplate !== previousTemplate.current) {
+    previousTemplate.current = normalizedTemplate;
+    const currentParams = new URLSearchParams(searchParams.toString());
+    currentParams.set("template", normalizedTemplate);
+    router.replace(`?${currentParams.toString()}`, { scroll: false });
+  }
+}, [currentTemplate, searchParams, router]);
+```
+
+This allows users to bookmark specific templates: `/editor?template=rhyhorn`
+
+## Template Details
+
+### Default Template
+
+**Location:** `components/preview/PDFDocument.tsx`
+
+The default template features:
+- Navy blue decorative bar at the top
+- Centered personal information header
+- Horizontal lines separating sections
+- Technical and Professional skills subsections
+- Clean, traditional layout
+
+**Color Scheme:**
+```typescript
+// components/preview/PDFDocument.tsx:20-21
+const NAVY_BLUE = "#1e4d7b";
+const TEAL = "#2e7d8a";
+```
+
+**Header Example:**
+```tsx
+// components/preview/PDFDocument.tsx:168-209
+<View style={{ textAlign: "center", marginBottom: 16 }}>
+  <Text style={{ fontSize: 28, fontWeight: "bold" }}>
+    {personalInfo.fullName || "TARIQ AHMAD"}
+  </Text>
+  {personalInfo.address && <Text>{personalInfo.address}</Text>}
+  {/* Contact links */}
+</View>
+```
+
+### Rhyhorn Template
+
+**Location:** `components/templates/rhyhorn/`
+
+The Rhyhorn template features:
+- Vibrant gradient header with profile image support
+- Modern, colorful design
+- Compact section headers with icons
+- Perfect for creative industries
+
+**Structure:**
+```typescript
+// components/templates/rhyhorn/RhyhornTemplate.tsx:21-42
+export const RhyhornTemplate = React.memo(function RhyhornTemplate({
+  data,
+  className,
+  id,
+}) {
+  const visibleSections = useMemo(() => {
+    return getVisibleSections(
+      normalizeSectionOrder(sectionOrder), 
+      hiddenSections
+    );
+  }, [sectionOrder, hiddenSections]);
+
+  return (
+    <div className="bg-white shadow-lg">
+      <RhyhornHeader personalInfo={personalInfo} />
+      {visibleSections.map(renderSection)}
+    </div>
+  );
+});
+```
+
+**Component Organization:**
+```
+components/templates/rhyhorn/
+├── RhyhornTemplate.tsx      # Main template component
+├── RhyhornPDF.tsx           # PDF version
+├── RhyhornHeader.tsx        # Header with gradient
+└── sections/
+    ├── ExperienceSection.tsx
+    ├── EducationSection.tsx
+    ├── ProjectsSection.tsx
+    ├── SkillsSection.tsx
+    ├── LanguagesSection.tsx
+    ├── AchievementsSection.tsx
+    └── ReferencesSection.tsx
+```
+
+### Nexus Template
+
+**Location:** `components/templates/nexus/`
+
+The Nexus template features:
+- Two-column layout with left sidebar
+- Profile image with circular frame
+- Sidebar background color: `#d9e3e8`
+- Section titles in teal: `#335f67`
+- Ideal for modern professional resumes
+
+**Color Constants:**
+```typescript
+// components/templates/nexus/NexusTemplate.tsx:19-20
+const SECTION_TITLE_COLOR = "#335f67";
+const SIDEBAR_BG = "#d9e3e8";
+```
+
+**Layout Structure:**
+```typescript
+// components/templates/nexus/NexusTemplate.tsx:96-100
+return (
+  <div className="bg-white shadow-lg min-h-[297mm] w-[210mm]">
+    {/* Left sidebar: personal info, skills, languages */}
+    {/* Right content: experience, education, projects */}
+  </div>
+);
+```
+
+**Profile Image Handling:**
+```typescript
+// components/templates/nexus/NexusTemplate.tsx:86-94
+const initials = (personalInfo.fullName || "CV")
+  .split(" ")
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0]?.toUpperCase())
+  .join("");
+
+const shouldShowImage = Boolean(currentImageUrl) && 
+  failedImageUrl !== currentImageUrl;
+```
+
+If no image is provided, displays initials in a colored circle.
+
+## Template Rendering
+
+### Web Preview
+
+All templates use the same `CVPreview` component which routes to the correct template:
+
+```tsx
+// components/preview/CVPreview.tsx (conceptual)
+function CVPreview({ data, template }) {
+  switch (template) {
+    case 'rhyhorn':
+      return <RhyhornTemplate data={data} />;
+    case 'nexus':
+      return <NexusTemplate data={data} />;
+    default:
+      return <DefaultTemplate data={data} />;
+  }
+}
+```
+
+### PDF Export
+
+PDF rendering uses `@react-pdf/renderer` with template-specific components:
+
+```typescript
+// components/preview/PDFDocument.tsx:134-148
+export function PDFDocument({ data, template }: PDFDocumentProps) {
+  const activeTemplate = template || data.template || 'default';
+
+  if (activeTemplate === 'rhyhorn') {
+    return <RhyhornPDF data={data} />;
+  }
+
+  if (activeTemplate === "nexus") {
+    return <NexusPDF data={data} />;
+  }
+
+  // Default template rendering
+  return <Document>...</Document>;
+}
+```
+
+<Info>
+Each template has both a React component for web preview and a separate PDF component using `@react-pdf/renderer` primitives.
+</Info>
+
+## Font Configuration
+
+All templates use the **Carlito** font family, which is metrically compatible with Calibri:
+
+```typescript
+// components/preview/PDFDocument.tsx:8-17
+Font.register({
+  family: 'Carlito',
+  fonts: [
+    { src: 'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Regular.ttf' },
+    { src: 'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Bold.ttf', 
+      fontWeight: 'bold' },
+    { src: 'https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Italic.ttf', 
+      fontStyle: 'italic' },
+  ]
+});
+```
+
+## Section Visibility
+
+All templates respect the `hiddenSections` array:
+
+```typescript
+// lib/types.ts:118-128
+export function getVisibleSections(
+  sectionOrder: SectionId[], 
+  hiddenSections?: SectionId[]
+): SectionId[] {
+  if (!hiddenSections || hiddenSections.length === 0) {
+    return sectionOrder;
+  }
+  return sectionOrder.filter(id => !hiddenSections.includes(id));
+}
+```
+
+Hidden sections are excluded from both preview and PDF export across all templates.
+
+## Adding Custom Templates
+
+<Steps>
+  <Step title="Create Template Component">
+    Create a new folder in `components/templates/` with your template name
+  </Step>
+  <Step title="Implement Interfaces">
+    Create both web (`TemplateComponent.tsx`) and PDF (`TemplatePDF.tsx`) versions
+  </Step>
+  <Step title="Update Type">
+    Add your template ID to the `TemplateId` type in `lib/types.ts`
+  </Step>
+  <Step title="Register Template">
+    Add routing logic in `CVPreview.tsx` and `PDFDocument.tsx`
+  </Step>
+  <Step title="Add to Selector">
+    Update `TemplateSelector` component to include your new template
+  </Step>
+</Steps>
+
+<Note>
+Ensure your template respects the `sectionOrder` and `hiddenSections` properties to maintain consistency.
+</Note>
+
+## Template Comparison
+
+| Feature | Default | Rhyhorn | Nexus |
+|---------|---------|---------|-------|
+| **Layout** | Single column | Single column | Two columns |
+| **Profile Image** | ❌ No | ✅ Header | ✅ Sidebar |
+| **Color Scheme** | Navy/Teal | Vibrant gradients | Muted teal/gray |
+| **Best For** | Traditional roles | Creative industries | Modern professional |
+| **Sections** | All 8 | All 8 | All 8 |
+| **Skills Format** | Categorized lists | Bullet points | Interests sidebar |
+
+## Template Data Normalization
+
+All templates receive normalized data:
+
+```typescript
+// hooks/useNormalizedCVData.ts (conceptual)
+export function useNormalizedCVData(control: Control<CVData>) {
+  return useWatch({
+    control,
+    defaultValue: {
+      ...initialCVData,
+      sectionOrder: normalizeSectionOrder(initialCVData.sectionOrder),
+    },
+  });
+}
+```
+
+This ensures:
+- Section order always includes all sections
+- `template` defaults to `'default'` if undefined
+- Hidden sections are properly filtered
+- All fields have valid default values

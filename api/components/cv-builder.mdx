@@ -1,0 +1,376 @@
+---
+title: CVBuilder
+description: Main CV Builder component with form management, real-time preview, and cloud sync
+---
+
+## Overview
+
+The `CVBuilder` component is the core of the CV Builder application. It provides a complete CV editing experience with:
+
+- Split-panel interface (editor on left, preview on right)
+- Real-time form validation and preview updates
+- Cloud synchronization with conflict resolution
+- Version control and history management
+- Template switching and customization
+- Authentication integration
+- Mobile-responsive design with tab-based navigation
+
+## Source Files
+
+- **Main Component**: `components/cv-builder.tsx` (1115 lines)
+- **Location**: `/workspace/source/components/cv-builder.tsx`
+
+## Architecture
+
+The component uses a layered architecture:
+
+1. **CVBuilder** (exported): Initializes React Hook Form and provides form context
+2. **CVBuilderContent**: Main UI implementation with hooks and state management
+3. **Helper Components**: PDFDownloadWrapper, LivePreviewWrapper, MobileEdgeToEdgePreview
+
+## Component Structure
+
+### CVBuilder (Main Export)
+
+The top-level component that sets up form management.
+
+```tsx
+import { CVBuilder } from "@/components/cv-builder";
+
+export default function Page() {
+  return <CVBuilder />;
+}
+```
+
+#### Features
+
+<ParamField path="Template URL Parameter" type="string" default="default">
+  Supports `?template=default|rhyhorn|nexus` query parameter for initial template selection.
+</ParamField>
+
+<ParamField path="Form Provider" type="FormProvider<CVData>">
+  Uses React Hook Form's `FormProvider` to manage CV data state across all child components.
+</ParamField>
+
+<ParamField path="Toast Notifications" type="ToastProvider">
+  Provides toast notification system for user feedback on save, sync, and errors.
+</ParamField>
+
+## State Management
+
+The component manages complex state for:
+
+### Form State
+
+Managed via React Hook Form with the `CVData` interface:
+
+```tsx
+const methods = useForm<CVData>({
+  defaultValues: {
+    ...initialCVData,
+    template: initialTemplate,
+  },
+  mode: "onChange",
+});
+```
+
+### Save Status
+
+```tsx
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+```
+
+<ParamField path="idle" type="SaveStatus">
+  No active save operation
+</ParamField>
+
+<ParamField path="saving" type="SaveStatus">
+  Save operation in progress
+</ParamField>
+
+<ParamField path="saved" type="SaveStatus">
+  Save completed successfully
+</ParamField>
+
+<ParamField path="error" type="SaveStatus">
+  Save operation failed
+</ParamField>
+
+### UI State
+
+<ParamField path="activeTab" type="'editor' | 'preview'">
+  Mobile tab selection (desktop shows both panels)
+</ParamField>
+
+<ParamField path="activeSection" type="SectionId">
+  Currently active form section for scroll-spy and navigation
+</ParamField>
+
+<ParamField path="isSidebarOpen" type="boolean">
+  Desktop sidebar visibility state
+</ParamField>
+
+<ParamField path="showAuthModal" type="boolean">
+  Authentication modal visibility
+</ParamField>
+
+## Custom Hooks
+
+The component integrates multiple custom hooks:
+
+### useCVDraft
+
+```tsx
+const { isLoading, saveToDraft, saveToCloud, checkForConflicts, syncAfterAuth } =
+  useCVDraft({
+    user,
+    isAuthLoading: authLoading,
+    initialTemplate,
+    onError: handleDraftError,
+  });
+```
+
+Handles local draft storage and cloud synchronization.
+
+### useCVVersions
+
+```tsx
+const {
+  versions,
+  isLoading,
+  saveNewVersion,
+  getVersionData,
+  restoreToVersion,
+  deleteVersionById,
+} = useCVVersions({ userId: user?.uid || null });
+```
+
+Manages CV version history and restoration.
+
+### useScrollSpy
+
+```tsx
+const { pauseObserver } = useScrollSpy({
+  sectionOrder,
+  hiddenSections,
+  onSectionChange: setActiveSection,
+  containerId: "editor-scroll-container",
+});
+```
+
+Tracks visible sections for navigation highlighting.
+
+### useAuth
+
+Provides authentication state and methods:
+
+```tsx
+const {
+  user,
+  loading,
+  isEmailVerified,
+  signIn,
+  signUp,
+  signOut,
+  sendVerificationEmail,
+} = useAuth();
+```
+
+## Conflict Resolution
+
+When local and cloud data diverge, the component displays a conflict resolution dialog:
+
+```tsx
+interface ConflictData {
+  localData: CVData;
+  serverData: CVData;
+  baseData?: CVData; // For three-way merge
+  localDate: Date;
+  serverDate: Date;
+}
+```
+
+### Resolution Options
+
+1. **Keep Local**: Overwrites cloud data with local changes
+2. **Keep Server**: Discards local changes, uses cloud data
+3. **Merge**: Three-way merge when base data is available
+4. **Close**: Keeps cloud data active, preserves local draft
+
+## Version Control
+
+Supports named version snapshots:
+
+```tsx
+const handleSaveVersion = async (
+  name: string,
+  description: string,
+  tags: string[]
+) => {
+  const versionId = await saveNewVersion({ versionName: name, description, tags });
+  return versionId !== null;
+};
+```
+
+### Version Operations
+
+<ParamField path="saveNewVersion" type="function">
+  Creates a new named version snapshot
+</ParamField>
+
+<ParamField path="getVersionData" type="function">
+  Retrieves version data by ID
+</ParamField>
+
+<ParamField path="restoreToVersion" type="function">
+  Restores CV data from a version
+</ParamField>
+
+<ParamField path="deleteVersionById" type="function">
+  Permanently deletes a version
+</ParamField>
+
+<ParamField path="updateVersion" type="function">
+  Updates version metadata (name, description, tags)
+</ParamField>
+
+## Layout Structure
+
+### Desktop Layout
+
+Two-panel split with resizable sections:
+
+```
+┌─────────────────────────────────────────┐
+│          Header Bar                     │
+├───────────────────┬─────────────────────┤
+│   Editor Panel    │   Preview Panel     │
+│   (40-45% width)  │   (55-60% width)    │
+│                   │                     │
+│  ┌─────────────┐  │  ┌───────────────┐  │
+│  │  Sidebar    │  │  │   Live        │  │
+│  │  Navigation │  │  │   Preview     │  │
+│  └─────────────┘  │  │   (A4 format) │  │
+│  ┌─────────────┐  │  └───────────────┘  │
+│  │Form Sections│  │                     │
+│  └─────────────┘  │                     │
+└───────────────────┴─────────────────────┘
+```
+
+### Mobile Layout
+
+Tab-based navigation:
+
+```
+┌─────────────────────────────────────────┐
+│          Header Bar                     │
+├─────────────────────────────────────────┤
+│  [Editor Tab] [Preview Tab]             │
+├─────────────────────────────────────────┤
+│                                         │
+│     Active Tab Content                  │
+│     (Full Width)                        │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+## Section Management
+
+Dynamic section rendering based on order and visibility:
+
+```tsx
+{normalizeSectionOrder(sectionOrder).map((sectionId) => (
+  <section key={sectionId} id={sectionId} data-section={sectionId}>
+    {sectionId === "personal" && <PersonalDetailsForm />}
+    {sectionId === "experience" && <ExperienceForm />}
+    {sectionId === "education" && <EducationForm />}
+    {/* ... */}
+  </section>
+))}
+```
+
+### Section Visibility
+
+<ParamField path="toggleSectionVisibility" type="(sectionId: SectionId) => void">
+  Toggles a section's visibility (except "personal" which is always visible)
+</ParamField>
+
+<ParamField path="resetHiddenSections" type="() => void">
+  Shows all sections by clearing the hidden sections array
+</ParamField>
+
+## PDF Generation
+
+On-demand PDF generation without preview overhead:
+
+```tsx
+const handleDownload = async () => {
+  const blob = await pdf(<PDFDocument data={data} template={template} />).toBlob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `CV-${data.personalInfo?.fullName?.replace(/\s+/g, "-") || "Export"}.pdf`;
+  link.click();
+};
+```
+
+## Template Switching
+
+Templates can be changed via selector:
+
+```tsx
+<TemplateSelector
+  currentTemplate={currentTemplate}
+  onTemplateChange={(template) =>
+    methods.setValue("template", template, { shouldDirty: true })
+  }
+/>
+```
+
+Supported templates: `default`, `rhyhorn`, `nexus`
+
+## Error Handling
+
+### Draft Errors
+
+```tsx
+type DraftErrorContext = "load" | "save" | "sync";
+
+const handleDraftError = (message: string, context: DraftErrorContext) => {
+  toast({
+    title: errorTitles[context],
+    description: message,
+    type: "error",
+  });
+};
+```
+
+### Save Errors
+
+Provides user-friendly messages based on error type:
+
+- **Permission errors**: Session expired, re-authentication required
+- **Network errors**: Connection issues, retry prompt
+- **Quota errors**: Data size limit exceeded
+
+## Accessibility Features
+
+- Keyboard navigation support
+- Focus management for section navigation
+- Screen reader announcements for save status
+- Reduced motion support via `useReducedMotion`
+- Touch-friendly controls on mobile
+
+## Performance Optimizations
+
+1. **Memoized Components**: Preview and form sections use React.memo
+2. **Normalized Data**: `useNormalizedCVData` hook prevents unnecessary re-renders
+3. **Lazy PDF Generation**: PDFs generated only on download, not on every change
+4. **Scroll Debouncing**: ScrollSpy uses pauseObserver to prevent excessive updates
+5. **Conditional Rendering**: Mobile/desktop layouts rendered conditionally
+
+## Related Components
+
+- [Form Components](/api/components/forms) - Individual form sections
+- [Preview Components](/api/components/preview) - CVPreview and PDFDocument
+- [Templates](/api/components/templates) - Template system and implementations

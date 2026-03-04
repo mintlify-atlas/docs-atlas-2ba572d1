@@ -1,0 +1,517 @@
+---
+title: "Guest Mode"
+description: "Build your CV offline with localStorage persistence and seamless migration to cloud storage"
+---
+
+## Overview
+
+Guest Mode allows users to create and edit their CV without authentication. All data is stored locally in the browser using localStorage, enabling offline work and instant auto-save without requiring sign-up.
+
+<Info>
+Guest Mode is perfect for trying out the app or working on your CV before committing to creating an account.
+</Info>
+
+## How Guest Mode Works
+
+### Local Storage
+
+All CV data is persisted to localStorage:
+
+```typescript
+// lib/backend/cvDraftStorage.ts:4-5
+const STORAGE_KEY = "cv-draft";
+const BASE_KEY = "cv-draft-base";
+```
+
+**Draft Storage Interface:**
+
+```typescript
+// lib/backend/cvDraftStorage.ts:7-10
+export interface DraftData {
+  data: CVData;
+  savedAt: string;  // ISO timestamp
+}
+```
+
+### Saving Drafts
+
+```typescript
+// lib/backend/cvDraftStorage.ts:16-28
+export function saveDraft(data: CVData): boolean {
+  try {
+    const draft: DraftData = {
+      data,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    return true;
+  } catch (error) {
+    console.error("[CVDraft] Failed to save draft:", error);
+    return false;
+  }
+}
+```
+
+### Loading Drafts
+
+```typescript
+// lib/backend/cvDraftStorage.ts:34-57
+export function loadDraft(): DraftData | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+
+    const draft = JSON.parse(stored) as DraftData;
+
+    // Validate the data structure
+    const validatedData = validateCVData(draft.data);
+    if (!validatedData) {
+      console.warn("Draft data failed validation, clearing");
+      clearDraft();
+      return null;
+    }
+
+    return {
+      data: validatedData,
+      savedAt: draft.savedAt,
+    };
+  } catch (error) {
+    console.error("Failed to load draft:", error);
+    return null;
+  }
+}
+```
+
+<Note>
+Drafts are automatically validated on load. Invalid data is cleared to prevent corruption.
+</Note>
+
+## Auto-Save in Guest Mode
+
+Auto-save runs every 5 seconds for guest users:
+
+```typescript
+// hooks/useCVDraft.ts:21
+const AUTO_SAVE_INTERVAL = 5000; // 5 seconds
+```
+
+**Only meaningful content is saved:**
+
+```typescript
+// lib/backend/cvDraftStorage.ts:89-122
+export function hasMeaningfulContent(data: CVData): boolean {
+  // Check personal info for non-empty string values
+  const personalInfoFields = [
+    data.personalInfo.fullName,
+    data.personalInfo.email,
+    data.personalInfo.phone,
+    data.personalInfo.address,
+    data.personalInfo.jobTitle,
+    data.personalInfo.summary,
+    data.personalInfo.website,
+    data.personalInfo.linkedin,
+    data.personalInfo.github,
+    data.personalInfo.profileImageUrl,
+  ];
+
+  const hasPersonalInfo = personalInfoFields.some(
+    (v) => typeof v === "string" && v.trim().length > 0
+  );
+
+  // Check for any array with items
+  const hasArrayContent =
+    data.experience.length > 0 ||
+    data.education.length > 0 ||
+    data.projects.length > 0 ||
+    data.achievements.length > 0 ||
+    data.languages.length > 0 ||
+    data.skills.length > 0;
+
+  // Check for non-default references
+  const hasReferences = (data.references || "").trim().length > 0 &&
+    data.references !== "Available upon request.";
+
+  return hasPersonalInfo || hasArrayContent || hasReferences;
+}
+```
+
+## Guest Mode Banner
+
+When not authenticated, a banner prompts users to sign in:
+
+```tsx
+// components/cv-builder.tsx:838-859
+{!user && (
+  <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 flex items-center gap-3">
+    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center shrink-0">
+      <CloudOff className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
+        Guest Mode
+      </p>
+      <p className="text-xs text-indigo-700/70 dark:text-indigo-300/70">
+        Sign in to save your CV to the cloud
+      </p>
+    </div>
+    <Button
+      size="sm"
+      onClick={() => setShowAuthModal(true)}
+      className="shrink-0 h-8 px-3"
+    >
+      Sign in
+    </Button>
+  </div>
+)}
+```
+
+## Migrating to Cloud
+
+When a guest user signs in, their local draft is automatically synced:
+
+### Post-Auth Sync
+
+```typescript
+// components/cv-builder.tsx:262-283
+useEffect(() => {
+  setPostAuthCallback(async (newUser) => {
+    await syncAfterAuth(newUser);
+    const conflict = await checkForConflicts();
+
+    if (conflict.hasConflict && conflict.localData && conflict.serverData) {
+      setConflictData({
+        localData: conflict.localData,
+        serverData: conflict.serverData,
+        baseData: conflict.baseData,
+        localDate: conflict.localDate!,
+        serverDate: conflict.serverDate!,
+      });
+      setShowConflictDialog(true);
+    } else if (!conflict.hasConflict) {
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    }
+  });
+
+  return () => setPostAuthCallback(null);
+}, [setPostAuthCallback, syncAfterAuth, checkForConflicts]);
+```
+
+### Sync Logic
+
+```typescript
+// hooks/useCVDraft.ts:182-260 (conceptual)
+const syncAfterAuth = useCallback(async (newUser: User) => {
+  try {
+    // Load local draft
+    const draft = loadDraft();
+    const localData = draft?.data;
+
+    // Load cloud data
+    const cloudData = await loadCV(newUser.uid);
+
+    if (!cloudData && localData) {
+      // No cloud data: upload local draft
+      await saveCV(newUser.uid, localData);
+      updateBaseAfterSync(localData);
+    } else if (cloudData && !localData) {
+      // No local data: use cloud data
+      reset(sanitizeLoadedData(cloudData));
+      updateBaseAfterSync(cloudData);
+    } else if (cloudData && localData) {
+      // Both exist: check for conflicts
+      // Handled by checkForConflicts()
+    }
+  } catch (error) {
+    console.error("Failed to sync after auth:", error);
+  }
+}, [reset, sanitizeLoadedData]);
+```
+
+## Conflict Resolution
+
+If both local and cloud data exist, users are prompted to choose:
+
+<Steps>
+  <Step title="Detect Conflict">
+    System compares local draft timestamp with cloud document timestamp
+  </Step>
+  <Step title="Show Dialog">
+    ConflictDialog displays both versions with timestamps
+  </Step>
+  <Step title="User Choice">
+    User can keep local version, use cloud version, or merge changes
+  </Step>
+</Steps>
+
+**Conflict Detection:**
+
+```typescript
+// hooks/useCVDraft.ts (conceptual)
+const checkForConflicts = useCallback(async () => {
+  const draft = loadDraft();
+  if (!draft || !user) {
+    return { hasConflict: false };
+  }
+
+  const cloudData = await loadCV(user.uid);
+  if (!cloudData) {
+    return { hasConflict: false };
+  }
+
+  // Compare timestamps or data
+  const hasChanges = hasDataChanged(draft.data, cloudData);
+  
+  if (hasChanges) {
+    return {
+      hasConflict: true,
+      localData: draft.data,
+      serverData: cloudData,
+      baseData: loadBase()?.data,
+      localDate: new Date(draft.savedAt),
+      serverDate: cloudDoc.updatedAt,
+    };
+  }
+
+  return { hasConflict: false };
+}, [user]);
+```
+
+### Three-Way Merge
+
+The conflict dialog offers automatic merge using a base version:
+
+```typescript
+// lib/backend/cvDraftStorage.ts:186-198
+export function saveBase(data: CVData): boolean {
+  try {
+    const base: BaseData = {
+      data,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(BASE_KEY, JSON.stringify(base));
+    return true;
+  } catch (error) {
+    console.error("[CVDraft] Failed to save base:", error);
+    return false;
+  }
+}
+```
+
+The base version represents the last known synced state, enabling intelligent merging of changes made in both local and cloud.
+
+<Info>
+Three-way merge compares local, cloud, and base versions to automatically resolve non-conflicting changes.
+</Info>
+
+## Data Validation
+
+All stored data is validated using Zod schemas:
+
+```typescript
+// lib/backend/cvValidation.ts (conceptual)
+import { z } from "zod";
+
+const cvDataSchema = z.object({
+  personalInfo: z.object({ /* ... */ }),
+  experience: z.array(/* ... */),
+  education: z.array(/* ... */),
+  // ... other fields
+});
+
+export function validateCVData(data: unknown): CVData | null {
+  const result = cvDataSchema.safeParse(data);
+  return result.success ? result.data : null;
+}
+```
+
+Invalid data is rejected on load:
+
+```typescript
+// lib/backend/cvDraftStorage.ts:42-47
+const validatedData = validateCVData(draft.data);
+if (!validatedData) {
+  console.warn("Draft data failed validation, clearing");
+  clearDraft();
+  return null;
+}
+```
+
+## Offline Capabilities
+
+Guest mode works entirely offline:
+
+- ✅ Edit all form fields
+- ✅ Real-time preview
+- ✅ Auto-save to localStorage
+- ✅ PDF export
+- ✅ Template switching
+- ✅ Section reordering
+- ❌ Version control (requires authentication)
+- ❌ Cloud backup (requires authentication)
+- ❌ Cross-device sync (requires authentication)
+
+## Storage Limits
+
+localStorage typically has a 5-10MB limit per domain:
+
+```typescript
+// Rough size calculation
+const draftSize = new Blob([JSON.stringify(draft)]).size;
+console.log(`Draft size: ${(draftSize / 1024).toFixed(2)} KB`);
+```
+
+<Warning>
+If localStorage is full, auto-save will fail. Clear browser data or sign in to use cloud storage.
+</Warning>
+
+## Privacy & Security
+
+### Local-Only Storage
+
+In guest mode, data never leaves the browser:
+
+- No server uploads
+- No tracking or analytics on CV content
+- Data stays on your device
+- Clearing browser data removes all traces
+
+### Sign-In Benefits
+
+Authenticating provides:
+
+1. **Cloud Backup**: Data synced to Firebase
+2. **Version Control**: Save multiple versions
+3. **Cross-Device**: Access from any device
+4. **Email Verification**: Account security
+5. **Recovery**: Restore if browser data is cleared
+
+## Clearing Guest Data
+
+### Manual Clear
+
+Users can clear all data using the "Clear" button:
+
+```typescript
+// components/cv-builder.tsx:400-405
+const handleClearAll = () => {
+  setShowClearConfirm(false);
+  methods.reset(initialCVData);
+  clearDraft();
+  toast({ title: "All fields cleared. Starting fresh.", type: "info" });
+};
+```
+
+### Programmatic Clear
+
+```typescript
+// lib/backend/cvDraftStorage.ts:75-83
+export function clearDraft(): boolean {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    return true;
+  } catch (error) {
+    console.error("[CVDraft] Failed to clear draft:", error);
+    return false;
+  }
+}
+```
+
+## Browser Compatibility
+
+Guest mode requires localStorage support:
+
+```javascript
+// Feature detection
+if (typeof localStorage !== 'undefined') {
+  // localStorage available
+} else {
+  // Fallback or warning
+}
+```
+
+Supported browsers:
+- ✅ Chrome 4+
+- ✅ Firefox 3.5+
+- ✅ Safari 4+
+- ✅ Edge (all versions)
+- ✅ Opera 10.5+
+
+## Migration Flow
+
+<Steps>
+  <Step title="Guest Creates CV">
+    User starts editing without signing in. Data auto-saves to localStorage.
+  </Step>
+  <Step title="Click Sign In">
+    User clicks "Sign in" button in banner or header
+  </Step>
+  <Step title="Authenticate">
+    User signs up or logs in via AuthModal
+  </Step>
+  <Step title="Auto-Sync">
+    Post-auth callback automatically uploads local draft to cloud
+  </Step>
+  <Step title="Conflict Check">
+    If cloud data exists (e.g., from another device), conflict dialog appears
+  </Step>
+  <Step title="Resolution">
+    User chooses to keep local, use cloud, or merge both versions
+  </Step>
+  <Step title="Cloud Enabled">
+    Future edits sync to cloud automatically
+  </Step>
+</Steps>
+
+## Change Detection
+
+To avoid unnecessary saves, changes are detected:
+
+```typescript
+// lib/backend/cvDraftStorage.ts:128-153
+export function hasDataChanged(a: CVData, b: CVData): boolean {
+  // Compare personal info
+  const personalA = JSON.stringify(a.personalInfo);
+  const personalB = JSON.stringify(b.personalInfo);
+  if (personalA !== personalB) return true;
+
+  // Compare arrays
+  const arraysDiffer = <T extends { id: string }>(arrA: T[], arrB: T[]): boolean => {
+    if (arrA.length !== arrB.length) return true;
+    return JSON.stringify(arrA) !== JSON.stringify(arrB);
+  };
+
+  if (arraysDiffer(a.experience, b.experience)) return true;
+  if (arraysDiffer(a.education, b.education)) return true;
+  if (arraysDiffer(a.projects, b.projects)) return true;
+  if (arraysDiffer(a.achievements, b.achievements)) return true;
+  if (arraysDiffer(a.languages, b.languages)) return true;
+  if (arraysDiffer(a.skills, b.skills)) return true;
+  if (JSON.stringify(a.sectionOrder) !== JSON.stringify(b.sectionOrder)) return true;
+  if (JSON.stringify(a.hiddenSections) !== JSON.stringify(b.hiddenSections)) return true;
+  if ((a.references || "") !== (b.references || "")) return true;
+  if ((a.template || "default") !== (b.template || "default")) return true;
+
+  return false;
+}
+```
+
+This prevents saving when nothing has actually changed.
+
+## Best Practices
+
+<Accordion title="For Guest Users">
+- Work on one device to avoid conflicts
+- Don't clear browser data while working
+- Sign in before switching devices
+- Export PDF backups periodically
+- Consider signing in for version control
+</Accordion>
+
+<Accordion title="For Developers">
+- Always validate data on load
+- Handle localStorage quota exceeded errors
+- Provide clear migration UX
+- Test with large CVs (multiple projects/experiences)
+- Support graceful degradation if localStorage fails
+</Accordion>

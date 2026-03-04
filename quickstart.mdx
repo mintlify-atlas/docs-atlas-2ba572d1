@@ -1,80 +1,341 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get from clone to your first resume in 5-10 minutes
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will help you set up CV Builder and create your first professional resume in just a few minutes.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **Time to complete**: 5-10 minutes
+  
+  **What you'll need**: Node.js 18.17+, a package manager (pnpm/npm/yarn), and optionally a Firebase project for cloud features
 </Note>
+
+## Quick Setup
+
+<Steps>
+  <Step title="Clone the Repository">
+    Get the CV Builder source code from GitHub:
+
+    ```bash
+    git clone https://github.com/tariqahmaad/CV-Builder.git
+    cd CV-Builder
+    ```
+
+    <Info>
+      The repository is named `CV-Builder` with a hyphen, not an underscore.
+    </Info>
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required packages using your preferred package manager:
+
+    <CodeGroup>
+    ```bash pnpm (Recommended)
+    pnpm install
+    ```
+
+    ```bash npm
+    npm install
+    ```
+
+    ```bash yarn
+    yarn install
+    ```
+    </CodeGroup>
+
+    This will install all dependencies including:
+    - Next.js 16.1.6 with React 19.2.3
+    - Firebase 12.8.0 for backend services
+    - Tailwind CSS 4.x for styling
+    - React Hook Form & Zod for form management
+    - @react-pdf/renderer for PDF export
+
+    <Info>
+      Installation typically takes 1-2 minutes depending on your internet connection.
+    </Info>
+  </Step>
+
+  <Step title="Start Development Server">
+    Launch the development server:
+
+    ```bash
+    pnpm dev
+    # or npm run dev / yarn dev
+    ```
+
+    You should see output similar to:
+
+    ```
+    ▲ Next.js 16.1.6
+    - Local:        http://localhost:3000
+    - Network:      http://192.168.1.x:3000
+
+    ✓ Ready in 2.3s
+    ```
+
+    <Success>
+      The application is now running! Open [http://localhost:3000](http://localhost:3000) in your browser.
+    </Success>
+  </Step>
+
+  <Step title="Create Your First Resume">
+    You can start building your resume immediately in **Guest Mode** (no authentication required):
+
+    1. Click **"Start Building"** on the landing page
+    2. You'll be redirected to `/editor`
+    3. Fill in your personal information in the left panel
+    4. Watch the real-time preview update on the right
+    5. Add experience, education, skills, and other sections
+    6. Export as PDF when ready
+
+    <Note>
+      In Guest Mode, all data is stored in your browser's localStorage. No account is needed to create and export resumes.
+    </Note>
+  </Step>
+</Steps>
+
+## Understanding the Editor
+
+### Layout Overview
+
+The editor page (`/editor`) is split into two main panels:
+
+```
+┌─────────────────────────────────────────────────┐
+│  Header (Template Selector, Actions)            │
+├──────────────────────┬──────────────────────────┤
+│                      │                          │
+│  Form Panel (Left)   │  Preview Panel (Right)   │
+│                      │                          │
+│  - Personal Info     │  - Real-time Preview     │
+│  - Experience        │  - Template Rendering    │
+│  - Education         │  - Section Visibility    │
+│  - Skills            │                          │
+│  - Projects          │                          │
+│  - etc.              │                          │
+│                      │                          │
+└──────────────────────┴──────────────────────────┘
+```
+
+### Key Features to Try
+
+<AccordionGroup>
+  <Accordion title="Template Switching">
+    Try different resume templates:
+    - **Default**: Traditional, clean layout
+    - **Rhyhorn**: Bold, modern design
+    - **Nexus**: Minimalist, ATS-focused
+
+    Switch templates from the header dropdown - your data remains intact across all templates.
+  </Accordion>
+
+  <Accordion title="Section Management">
+    - **Reorder sections**: Drag and drop section headers to change their order
+    - **Hide sections**: Toggle visibility to exclude sections from your resume
+    - **Add entries**: Use the "+" button to add multiple experiences, education entries, etc.
+
+    <Info>
+      The personal information section is always displayed first and cannot be hidden.
+    </Info>
+  </Accordion>
+
+  <Accordion title="Auto-Save">
+    Your changes are automatically saved to localStorage as you type. There's no manual save button needed in Guest Mode.
+
+    ```typescript lib/backend/cvDraftStorage.ts
+    // Draft saved automatically every few seconds
+    export function saveDraft(data: CVData): void {
+      localStorage.setItem('cv-draft', JSON.stringify(data));
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="PDF Export">
+    Click the **"Export PDF"** button in the header to generate a professional PDF resume.
+
+    The PDF is generated using `@react-pdf/renderer` with:
+    - Proper A4 page formatting
+    - Professional typography and spacing
+    - ATS-friendly structure
+    - Support for all three templates
+  </Accordion>
+</AccordionGroup>
+
+## Optional: Enable Cloud Features
+
+To unlock version control and multi-device sync, set up Firebase:
+
+<Steps>
+  <Step title="Create Firebase Project">
+    1. Go to [Firebase Console](https://console.firebase.google.com/)
+    2. Click **"Add project"**
+    3. Name your project (e.g., "cv-builder-app")
+    4. Disable Google Analytics (optional)
+    5. Click **"Create project"**
+  </Step>
+
+  <Step title="Enable Services">
+    In your Firebase project:
+
+    **Authentication:**
+    - Go to **Build > Authentication**
+    - Click **"Get started"**
+    - Enable **Email/Password** provider
+
+    **Firestore Database:**
+    - Go to **Build > Firestore Database**
+    - Click **"Create database"**
+    - Start in **production mode**
+    - Choose your preferred location
+
+    **Storage (for profile images):**
+    - Go to **Build > Storage**
+    - Click **"Get started"**
+    - Start in **production mode**
+  </Step>
+
+  <Step title="Get Configuration">
+    1. Go to **Project Settings** (gear icon)
+    2. Scroll to **Your apps**
+    3. Click the web icon (`</>`)
+    4. Register your app (e.g., "CV Builder Web")
+    5. Copy the Firebase configuration object
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Create a `.env.local` file in the project root:
+
+    ```bash .env.local
+    NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key_here
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+    NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_measurement_id
+    ```
+
+    <Warning>
+      Never commit `.env.local` to version control. It's already in `.gitignore`.
+    </Warning>
+
+    These variables are used in `lib/firebase.ts`:
+
+    ```typescript lib/firebase.ts
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    };
+    ```
+  </Step>
+
+  <Step title="Restart Development Server">
+    Stop the server (`Ctrl+C`) and restart it to load the new environment variables:
+
+    ```bash
+    pnpm dev
+    ```
+
+    <Success>
+      You can now sign up and sign in! Your resumes will sync to Firestore.
+    </Success>
+  </Step>
+</Steps>
+
+## Using Cloud Features
+
+Once Firebase is configured:
+
+### Sign Up / Sign In
+
+1. Click **"Sign In"** in the navigation
+2. Create an account with email and password
+3. Your guest mode data will be synced to the cloud
+
+### Version Control
+
+Save and manage multiple versions of your resume:
+
+```typescript lib/cvService.ts
+// Save a named version
+export async function saveVersion(
+  userId: string,
+  data: CVData,
+  input: CVVersionInput,
+  isAutoSave: boolean = false
+): Promise<string | null>
+
+// Restore a previous version
+export async function restoreVersion(
+  userId: string, 
+  versionId: string
+): Promise<boolean>
+```
+
+**How to use:**
+1. Click **"Versions"** in the editor header
+2. Click **"Save Version"**
+3. Name your version (e.g., "Software Engineer - FAANG")
+4. Add optional description and tags
+5. Restore any previous version with one click
+
+<Info>
+  An automatic backup is created before every restore operation to prevent data loss.
+</Info>
+
+### Multi-Device Sync
+
+Sign in on any device to access your resumes. Changes sync automatically through Firestore.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="gear" href="/installation">
+    Detailed setup instructions with troubleshooting
+  </Card>
+  <Card title="Templates" icon="paintbrush" href="/features/templates">
+    Learn about available resume templates
+  </Card>
+  <Card title="User Guide" icon="book-open" href="/guide/creating-resume">
+    Complete guide to creating resumes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/services/cv-service">
+    Explore the CV service API
+  </Card>
+</CardGroup>
+
+## Common Quick Tips
+
+<AccordionGroup>
+  <Accordion title="How do I add a profile photo?">
+    In the Personal Information section, click the profile photo placeholder to upload an image. You'll be able to crop it before saving.
+  </Accordion>
+
+  <Accordion title="Can I change the section order?">
+    Yes! You can reorder sections by dragging section headers. The personal information section always stays first.
+  </Accordion>
+
+  <Accordion title="How do I hide a section?">
+    Click the eye icon next to any section header to hide it from the preview and PDF export.
+  </Accordion>
+
+  <Accordion title="Does it work offline?">
+    Yes, in Guest Mode the app works completely offline using localStorage. Cloud features require an internet connection.
+  </Accordion>
+
+  <Accordion title="How do I switch between resumes?">
+    When signed in, go to `/resumes` to view all your saved resumes and create new ones. Each resume has its own version history.
+  </Accordion>
+</AccordionGroup>
+
+<Success>
+  **You're all set!** You now have a fully functional resume builder. Start creating your professional resume today.
+</Success>

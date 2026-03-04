@@ -1,0 +1,582 @@
+---
+title: 'Merge Result Types'
+description: 'TypeScript interfaces for three-way merge conflict detection and resolution'
+---
+
+## Overview
+
+TypeScript interfaces for handling CV data conflicts during three-way merge operations. Used when local and server data diverge from a common base version.
+
+## MergeResult
+
+Result of a three-way merge operation.
+
+```typescript
+interface MergeResult {
+  merged: CVData;
+  conflicts: FieldConflict[];
+  hasConflicts: boolean;
+}
+```
+
+### Fields
+
+<ParamField path="merged" type="CVData" required>
+  Automatically merged CV data. Contains resolved fields and best-guess resolutions for conflicts.
+  
+  **Automatic resolution rules:**
+  - Arrays: Merges by item ID, preserving both local and server additions
+  - Primitive fields: Prefers local changes over server changes
+  - Section order: Merges unique items from both versions
+  - Hidden sections: Combines both arrays
+</ParamField>
+
+<ParamField path="conflicts" type="FieldConflict[]" required>
+  Array of unresolvable conflicts requiring user decision.
+  
+  Empty array if `hasConflicts` is `false`.
+</ParamField>
+
+<ParamField path="hasConflicts" type="boolean" required>
+  `true` if manual conflict resolution is required. `false` if merge was fully automatic.
+</ParamField>
+
+### Usage
+
+```typescript
+import { performThreeWayMerge } from '@/lib/backend/cvMerge';
+
+const result: MergeResult = performThreeWayMerge(
+  baseData,    // Last synced version
+  localData,   // Local changes
+  serverData   // Server changes
+);
+
+if (result.hasConflicts) {
+  // Show conflict resolution UI
+  showConflictDialog(result.conflicts, result.merged);
+} else {
+  // Auto-merge successful
+  await saveCV(userId, result.merged);
+  toast.success('Changes merged successfully');
+}
+```
+
+## FieldConflict
+
+Represents a single unresolvable conflict between local and server data.
+
+```typescript
+interface FieldConflict {
+  section: SectionId | 'sectionOrder' | 'hiddenSections' | 'template' | 'references';
+  field?: string;
+  localValue: unknown;
+  serverValue: unknown;
+  baseValue: unknown;
+  description?: string;
+}
+```
+
+### Fields
+
+<ParamField path="section" type="string" required>
+  CV section where conflict occurred.
+  
+  **Possible values:**
+  - `'personal'` - Personal info conflict
+  - `'experience'` - Experience array conflict
+  - `'education'` - Education array conflict
+  - `'projects'` - Projects array conflict
+  - `'achievements'` - Achievements array conflict
+  - `'languages'` - Languages array conflict
+  - `'skills'` - Skills array conflict
+  - `'references'` - References text conflict
+  - `'sectionOrder'` - Section ordering conflict
+  - `'hiddenSections'` - Hidden sections conflict
+  - `'template'` - Template selection conflict
+</ParamField>
+
+<ParamField path="field" type="string">
+  Specific field or item ID within the section.
+  
+  **Examples:**
+  - `'personalInfo.fullName'` - Nested field path
+  - `'experience_123'` - Array item ID
+  - `undefined` - Entire section conflict (e.g., array order)
+</ParamField>
+
+<ParamField path="localValue" type="unknown" required>
+  Value from local draft.
+</ParamField>
+
+<ParamField path="serverValue" type="unknown" required>
+  Value from server data.
+</ParamField>
+
+<ParamField path="baseValue" type="unknown" required>
+  Value from base version (last sync point).
+  
+  Used to determine which side made changes.
+</ParamField>
+
+<ParamField path="description" type="string">
+  Human-readable description of the conflict.
+  
+  **Example:** `"Full name changed in both versions"`
+</ParamField>
+
+### Usage
+
+```typescript
+const ConflictResolver = ({ conflicts }: { conflicts: FieldConflict[] }) => {
+  const [resolutions, setResolutions] = useState<Record<string, 'local' | 'server'>>({});
+  
+  return (
+    <div>
+      <h2>Resolve Conflicts</h2>
+      {conflicts.map((conflict, i) => (
+        <div key={i} className="border rounded p-4 mb-4">
+          <h3 className="font-semibold">
+            {conflict.section}
+            {conflict.field && ` - ${conflict.field}`}
+          </h3>
+          
+          {conflict.description && (
+            <p className="text-sm text-muted-foreground mb-2">
+              {conflict.description}
+            </p>
+          )}
+          
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            <Button
+              variant={resolutions[i] === 'local' ? 'default' : 'outline'}
+              onClick={() => setResolutions({ ...resolutions, [i]: 'local' })}
+            >
+              Keep Local
+              <pre className="text-xs mt-2">
+                {JSON.stringify(conflict.localValue, null, 2)}
+              </pre>
+            </Button>
+            
+            <Button
+              variant={resolutions[i] === 'server' ? 'default' : 'outline'}
+              onClick={() => setResolutions({ ...resolutions, [i]: 'server' })}
+            >
+              Keep Server
+              <pre className="text-xs mt-2">
+                {JSON.stringify(conflict.serverValue, null, 2)}
+              </pre>
+            </Button>
+          </div>
+        </div>
+      ))}
+      
+      <Button
+        onClick={() => applyResolutions(conflicts, resolutions)}
+        disabled={Object.keys(resolutions).length < conflicts.length}
+      >
+        Apply Resolutions
+      </Button>
+    </div>
+  );
+};
+```
+
+## BaseData
+
+Base version for three-way merge operations.
+
+```typescript
+interface BaseData {
+  data: CVData;
+  savedAt: string;
+}
+```
+
+### Fields
+
+<ParamField path="data" type="CVData" required>
+  CV data from the last successful sync.
+  
+  See [CVData](/api/types/cv-data) for structure.
+</ParamField>
+
+<ParamField path="savedAt" type="string" required>
+  ISO 8601 timestamp of when this base was created.
+  
+  **Format:** `"2024-03-04T12:34:56.789Z"`
+</ParamField>
+
+### Usage
+
+Stored in localStorage to track merge base:
+
+```typescript
+import { updateBaseAfterSync, loadBase } from '@/lib/backend/cvDraftStorage';
+
+// Save base after successful sync
+const saveCV = async (userId: string, data: CVData) => {
+  await saveCVToFirebase(userId, data);
+  updateBaseAfterSync(data); // Store as merge base
+};
+
+// Load base for conflict detection
+const checkConflicts = async () => {
+  const base = loadBase();
+  const local = loadDraft();
+  const server = await loadCV(userId);
+  
+  if (base && local && server) {
+    const result = performThreeWayMerge(base.data, local.data, server);
+    return result;
+  }
+};
+```
+
+## CVDataKey
+
+Type-safe keys for CVData object.
+
+```typescript
+type CVDataKey = keyof CVData;
+```
+
+**All possible keys:**
+```typescript
+'personalInfo'
+| 'experience'
+| 'education'
+| 'projects'
+| 'achievements'
+| 'languages'
+| 'skills'
+| 'sectionOrder'
+| 'references'
+| 'hiddenSections'
+| 'template'
+```
+
+### Usage
+
+```typescript
+const updateSection = <K extends CVDataKey>(
+  data: CVData,
+  key: K,
+  value: CVData[K]
+): CVData => {
+  return {
+    ...data,
+    [key]: value
+  };
+};
+
+// Type-safe section update
+const updated = updateSection(cvData, 'experience', [...newExperiences]);
+```
+
+## Three-Way Merge Algorithm
+
+### How It Works
+
+1. **Compare each field** in base, local, and server versions
+2. **Detect changes:**
+   - If base → local changed AND base → server unchanged: Use local
+   - If base → server changed AND base → local unchanged: Use server
+   - If both changed to same value: Use either (no conflict)
+   - If both changed to different values: **CONFLICT**
+3. **Merge arrays:**
+   - Match items by ID
+   - Add new items from both sides
+   - Update changed items from both sides
+   - Delete removed items from both sides
+   - Detect conflicts when same item edited differently
+
+### Conflict Types
+
+#### Field Conflicts
+
+Both sides modified the same field:
+
+```typescript
+{
+  section: 'personal',
+  field: 'fullName',
+  localValue: 'John A. Doe',
+  serverValue: 'John Andrew Doe',
+  baseValue: 'John Doe',
+  description: 'Full name changed in both versions'
+}
+```
+
+#### Array Item Conflicts
+
+Same item modified differently:
+
+```typescript
+{
+  section: 'experience',
+  field: 'exp_123',
+  localValue: { role: 'Senior Engineer', ... },
+  serverValue: { role: 'Staff Engineer', ... },
+  baseValue: { role: 'Engineer', ... },
+  description: 'Experience item modified in both versions'
+}
+```
+
+#### Deletion Conflicts
+
+Item deleted on one side, modified on other:
+
+```typescript
+{
+  section: 'projects',
+  field: 'proj_456',
+  localValue: null,  // Deleted locally
+  serverValue: { title: 'Updated Project', ... },
+  baseValue: { title: 'Old Project', ... },
+  description: 'Project deleted locally but modified on server'
+}
+```
+
+## Advanced Examples
+
+### Conflict Resolution UI
+
+```typescript
+const ThreeWayMergeDialog = ({
+  baseData,
+  localData,
+  serverData,
+  onResolve
+}: {
+  baseData: CVData;
+  localData: CVData;
+  serverData: CVData;
+  onResolve: (merged: CVData) => void;
+}) => {
+  const [result, setResult] = useState<MergeResult>(
+    performThreeWayMerge(baseData, localData, serverData)
+  );
+  const [merged, setMerged] = useState(result.merged);
+  
+  const resolveConflict = (
+    conflict: FieldConflict,
+    choice: 'local' | 'server'
+  ) => {
+    const value = choice === 'local' ? conflict.localValue : conflict.serverValue;
+    
+    // Apply resolution to merged data
+    const updated = { ...merged };
+    if (conflict.field) {
+      // Nested field
+      set(updated, `${conflict.section}.${conflict.field}`, value);
+    } else {
+      // Top-level section
+      (updated as any)[conflict.section] = value;
+    }
+    
+    setMerged(updated);
+    
+    // Remove from conflicts
+    setResult({
+      ...result,
+      conflicts: result.conflicts.filter(c => c !== conflict),
+      hasConflicts: result.conflicts.length > 1
+    });
+  };
+  
+  return (
+    <Dialog open>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Resolve Data Conflicts</DialogTitle>
+          <DialogDescription>
+            Your local changes conflict with server changes. Choose which version to keep.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          {result.conflicts.map((conflict, i) => (
+            <ConflictCard
+              key={i}
+              conflict={conflict}
+              onResolve={choice => resolveConflict(conflict, choice)}
+            />
+          ))}
+        </div>
+        
+        <DialogFooter>
+          <Button
+            onClick={() => onResolve(merged)}
+            disabled={result.hasConflicts}
+          >
+            Apply Merge
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const ConflictCard = ({
+  conflict,
+  onResolve
+}: {
+  conflict: FieldConflict;
+  onResolve: (choice: 'local' | 'server') => void;
+}) => {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">
+          {conflict.section}
+          {conflict.field && <span className="text-muted-foreground"> / {conflict.field}</span>}
+        </CardTitle>
+        {conflict.description && (
+          <CardDescription>{conflict.description}</CardDescription>
+        )}
+      </CardHeader>
+      
+      <CardContent>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <h4 className="text-sm font-semibold mb-2">Base Version</h4>
+            <ValueDisplay value={conflict.baseValue} />
+          </div>
+          
+          <div>
+            <h4 className="text-sm font-semibold mb-2">Local Changes</h4>
+            <ValueDisplay value={conflict.localValue} />
+            <Button
+              size="sm"
+              className="mt-2"
+              onClick={() => onResolve('local')}
+            >
+              Keep Local
+            </Button>
+          </div>
+          
+          <div>
+            <h4 className="text-sm font-semibold mb-2">Server Changes</h4>
+            <ValueDisplay value={conflict.serverValue} />
+            <Button
+              size="sm"
+              className="mt-2"
+              onClick={() => onResolve('server')}
+            >
+              Keep Server
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+```
+
+### Auto-Resolution Strategy
+
+```typescript
+const autoResolveConflicts = (
+  result: MergeResult,
+  strategy: 'prefer-local' | 'prefer-server' | 'prefer-newest'
+): CVData => {
+  let merged = { ...result.merged };
+  
+  for (const conflict of result.conflicts) {
+    let chosenValue: unknown;
+    
+    switch (strategy) {
+      case 'prefer-local':
+        chosenValue = conflict.localValue;
+        break;
+      
+      case 'prefer-server':
+        chosenValue = conflict.serverValue;
+        break;
+      
+      case 'prefer-newest':
+        // Assume server is newer (or check timestamps)
+        chosenValue = conflict.serverValue;
+        break;
+    }
+    
+    // Apply resolution
+    if (conflict.field) {
+      set(merged, `${conflict.section}.${conflict.field}`, chosenValue);
+    } else {
+      (merged as any)[conflict.section] = chosenValue;
+    }
+  }
+  
+  return merged;
+};
+
+// Usage
+const result = performThreeWayMerge(base, local, server);
+
+if (result.hasConflicts) {
+  const autoMerged = autoResolveConflicts(result, 'prefer-local');
+  await saveCV(userId, autoMerged);
+}
+```
+
+## Best Practices
+
+### Update Base After Every Sync
+
+```typescript
+const saveCV = async (userId: string, data: CVData) => {
+  await saveCVToFirebase(userId, data);
+  
+  // Critical: Update base for future merges
+  updateBaseAfterSync(data);
+  
+  clearDraft(); // Clear local draft
+};
+```
+
+### Check for Conflicts Before Login
+
+```typescript
+const handleLogin = async (user: User) => {
+  const { hasConflict, localData, serverData, baseData } = await checkForConflicts();
+  
+  if (hasConflict && localData && serverData && baseData) {
+    const result = performThreeWayMerge(baseData, localData, serverData);
+    
+    if (result.hasConflicts) {
+      // Show resolution UI
+      showMergeDialog(result);
+    } else {
+      // Auto-merge successful
+      await saveCV(user.uid, result.merged);
+    }
+  }
+};
+```
+
+### Provide Clear Conflict Descriptions
+
+```typescript
+const describeConflict = (conflict: FieldConflict): string => {
+  const section = conflict.section;
+  const field = conflict.field;
+  
+  if (section === 'personal' && field) {
+    return `${field.split('.').pop()} was changed in both versions`;
+  }
+  
+  if (field) {
+    return `${section} item "${field}" was modified in both versions`;
+  }
+  
+  return `${section} was changed in both versions`;
+};
+```
+
+## Related
+
+- [useCVDraft Hook](/api/hooks/use-cv-draft) - Draft management with conflict detection
+- [CVData Types](/api/types/cv-data) - CV data structure
+- [Version Control Types](/api/types/version-control) - Version management

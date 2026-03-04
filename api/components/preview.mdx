@@ -1,0 +1,465 @@
+---
+title: Preview Components
+description: CVPreview and PDFDocument components for rendering CV templates in browser and PDF formats
+---
+
+## Overview
+
+Preview components render CV data in both browser (HTML) and PDF formats. They support multiple templates and ensure visual consistency between the live preview and exported PDF.
+
+## Source Files
+
+- **CVPreview**: `components/preview/CVPreview.tsx` (278 lines)
+- **PDFDocument**: `components/preview/PDFDocument.tsx` (383 lines)
+
+## CVPreview
+
+Renders live CV preview in the browser using React components.
+
+### Usage
+
+```tsx
+import { CVPreview } from "@/components/preview/CVPreview";
+
+const data = useNormalizedCVData(control);
+
+<CVPreview data={data} template="default" />;
+```
+
+### Props
+
+<ParamField path="data" type="CVData" required>
+  Complete CV data object containing all sections
+</ParamField>
+
+<ParamField path="template" type="TemplateId" default="default">
+  Template to use for rendering. Options: `default`, `rhyhorn`, `nexus`
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes for the container
+</ParamField>
+
+<ParamField path="id" type="string">
+  HTML id attribute for the container element
+</ParamField>
+
+### Template Rendering
+
+The component delegates to template-specific implementations:
+
+```tsx
+export const CVPreview = React.memo(function CVPreview({
+  data,
+  className,
+  id,
+  template,
+}) {
+  const activeTemplate = template || data.template || "default";
+
+  // Render Rhyhorn template
+  if (activeTemplate === "rhyhorn") {
+    return <RhyhornTemplate data={data} className={className} id={id} />;
+  }
+
+  // Render Nexus template
+  if (activeTemplate === "nexus") {
+    return <NexusTemplate data={data} className={className} id={id} />;
+  }
+
+  // Default template rendering
+  return <DefaultTemplateMarkup />;
+});
+```
+
+### Default Template Structure
+
+The default template uses a single-column layout:
+
+```tsx
+<div
+  className="bg-white text-black p-[0.5in] shadow-lg min-h-[297mm] w-[210mm]"
+  style={{
+    fontFamily: "Carlito, Calibri, Arial, sans-serif",
+    fontSize: "11pt",
+    lineHeight: "1.3",
+  }}
+>
+  {/* Decorative blue header bar */}
+  <div className="mb-4 h-[15px]" style={{ backgroundColor: "#1e4d7b" }} />
+
+  {/* Render sections in order */}
+  {sectionOrder.map((sectionId) => renderSection(sectionId))}
+</div>
+```
+
+### Section Rendering
+
+Sections are rendered based on the `sectionOrder` array:
+
+```tsx
+{sectionOrder.map((sectionId) => {
+  switch (sectionId) {
+    case "personal":
+      return <PersonalSection />;
+    case "experience":
+      return experience.length > 0 ? <ExperienceSection /> : null;
+    case "education":
+      return education.length > 0 ? <EducationSection /> : null;
+    // ...
+  }
+})}
+```
+
+Empty sections are automatically hidden.
+
+### Personal Section
+
+Renders contact information and summary:
+
+```tsx
+<section className="mb-4">
+  <div className="text-center mb-4">
+    <h1 className="font-bold text-[28pt] leading-tight mb-1">
+      {personalInfo.fullName || "TARIQ AHMAD"}
+    </h1>
+    {personalInfo.address && <p className="text-[11pt] mb-1">{personalInfo.address}</p>}
+    <p className="text-[11pt]">
+      {personalInfo.phone && <span>{personalInfo.phone}</span>}
+      {personalInfo.email && (
+        <>
+          {" | "}
+          <a href={`mailto:${personalInfo.email}`}>{personalInfo.email}</a>
+        </>
+      )}
+    </p>
+  </div>
+
+  {personalInfo.summary && (
+    <div>
+      <SectionHeader title="Career Objective" />
+      <p>{personalInfo.summary}</p>
+    </div>
+  )}
+</section>
+```
+
+### Skills Section
+
+Skills are categorized and displayed with headers:
+
+```tsx
+const technicalSkills = skills.filter((s) => !s.category || s.category === "technical");
+const professionalSkills = skills.filter((s) => s.category === "professional");
+
+<section className="mb-4">
+  <SectionHeader title="Key Skills" />
+  {technicalSkills.length > 0 && (
+    <>
+      <p className="font-bold underline">Technical skills:</p>
+      <ul className="pl-[20pt]">
+        {technicalSkills.map((skill) => (
+          <li key={skill.id}>
+            <span className="font-bold">{skill.name}:</span> {skill.description}
+          </li>
+        ))}
+      </ul>
+    </>
+  )}
+</section>;
+```
+
+### Performance Optimization
+
+The component uses React.memo and useMemo:
+
+```tsx
+export const CVPreview = React.memo(function CVPreview({ data, template }) {
+  const { sectionOrder, technicalSkills, professionalSkills } = useMemo(() => {
+    const order = getVisibleSections(
+      normalizeSectionOrder(data.sectionOrder),
+      data.hiddenSections
+    );
+    const tech = skills.filter((s) => !s.category || s.category === "technical");
+    const prof = skills.filter((s) => s.category === "professional");
+    return { sectionOrder: order, technicalSkills: tech, professionalSkills: prof };
+  }, [data.sectionOrder, data.hiddenSections, skills]);
+});
+```
+
+## PDFDocument
+
+Generates PDF version using @react-pdf/renderer.
+
+### Usage
+
+```tsx
+import { pdf } from "@react-pdf/renderer";
+import { PDFDocument } from "@/components/preview/PDFDocument";
+
+const blob = await pdf(<PDFDocument data={data} template="default" />).toBlob();
+```
+
+### Props
+
+<ParamField path="data" type="CVData" required>
+  Complete CV data object
+</ParamField>
+
+<ParamField path="template" type="TemplateId" default="default">
+  Template to use for PDF generation
+</ParamField>
+
+### Font Registration
+
+PDFs use the Carlito font (Calibri alternative):
+
+```tsx
+import { Font } from "@react-pdf/renderer";
+
+Font.register({
+  family: "Carlito",
+  fonts: [
+    {
+      src: "https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Regular.ttf",
+    },
+    {
+      src: "https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Bold.ttf",
+      fontWeight: "bold",
+    },
+    {
+      src: "https://raw.githubusercontent.com/googlefonts/carlito/main/fonts/ttf/Carlito-Italic.ttf",
+      fontStyle: "italic",
+    },
+  ],
+});
+```
+
+### PDF Styles
+
+Styles are defined using StyleSheet.create:
+
+```tsx
+import { StyleSheet } from "@react-pdf/renderer";
+
+const styles = StyleSheet.create({
+  page: {
+    fontFamily: "Carlito",
+    fontSize: 11,
+    paddingTop: 36, // 0.5 inches
+    paddingBottom: 36,
+    paddingLeft: 36,
+    paddingRight: 36,
+    color: "#000000",
+    lineHeight: 1.3,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontFamily: "Carlito",
+    fontWeight: "bold",
+    color: "#000000",
+    marginBottom: 4,
+  },
+  horizontalLine: {
+    borderTopWidth: 0.5,
+    borderTopColor: "#000000",
+  },
+});
+```
+
+### PDF Structure
+
+```tsx
+export function PDFDocument({ data, template }: PDFDocumentProps) {
+  const activeTemplate = template || data.template || "default";
+
+  // Delegate to template-specific PDF component
+  if (activeTemplate === "rhyhorn") {
+    return <RhyhornPDF data={data} />;
+  }
+
+  if (activeTemplate === "nexus") {
+    return <NexusPDF data={data} />;
+  }
+
+  // Default PDF template
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        {/* Decorative bar */}
+        <View style={{ backgroundColor: "#1e4d7b", height: 15, marginBottom: 16 }} />
+
+        {/* Render sections */}
+        {sectionOrder.map((sectionId) => renderSection(sectionId))}
+      </Page>
+    </Document>
+  );
+}
+```
+
+### Section Header Component
+
+Reusable section header for PDF:
+
+```tsx
+const SectionHeader = ({ title }: { title: string }) => (
+  <View style={styles.sectionHeader}>
+    <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={styles.horizontalLine} />
+  </View>
+);
+```
+
+### Experience Section (PDF)
+
+Example of list rendering in PDF:
+
+```tsx
+<View key={sectionId} style={styles.section}>
+  <SectionHeader title="Relevant Experience" />
+  {experience.map((job) => (
+    <View key={job.id} style={styles.itemContainer} wrap={false}>
+      <View style={styles.tableRow}>
+        <Text style={styles.tableLeft}>
+          {job.role}
+          {job.company ? ` at ${job.company}` : ""}
+        </Text>
+        <Text style={styles.tableRight}>
+          {[job.startDate, job.endDate || (job.current ? "Present" : "")]
+            .filter(Boolean)
+            .join(" – ")}
+        </Text>
+      </View>
+      {job.description &&
+        job.description
+          .split("\n")
+          .filter((line) => line.trim())
+          .map((line, i) => (
+            <View key={i} style={styles.bulletRow}>
+              <Text style={styles.bullet}>•</Text>
+              <Text style={styles.bulletText}>{line.replace(/^[-•]\s*/, "")}</Text>
+            </View>
+          ))}
+    </View>
+  ))}
+</View>
+```
+
+### Page Breaking
+
+Prevents items from breaking across pages:
+
+```tsx
+<View key={job.id} wrap={false}>
+  {/* Item content */}
+</View>
+```
+
+## Template-Specific Rendering
+
+### Rhyhorn Template
+
+Minimalist design with clean typography:
+
+```tsx
+import { RhyhornTemplate } from "@/components/templates/rhyhorn/RhyhornTemplate";
+import { RhyhornPDF } from "@/components/templates/rhyhorn/RhyhornPDF";
+```
+
+Features:
+
+- Profile image support
+- Minimal header design
+- Ample whitespace
+- Section-based architecture
+
+### Nexus Template
+
+Two-column layout with sidebar:
+
+```tsx
+import { NexusTemplate } from "@/components/templates/nexus/NexusTemplate";
+import { NexusPDF } from "@/components/templates/nexus/NexusPDF";
+```
+
+Features:
+
+- Two-column layout
+- Highlighted sidebar
+- Profile image in header
+- Structured content areas
+
+## Color Constants
+
+Shared color palette:
+
+```tsx
+const NAVY_BLUE = "#1e4d7b";
+const TEAL = "#2e7d8a";
+```
+
+Used consistently across templates.
+
+## Data Normalization
+
+Both components handle missing or incomplete data:
+
+```tsx
+const sectionOrder = getVisibleSections(
+  normalizeSectionOrder(data.sectionOrder),
+  data.hiddenSections
+);
+
+const technicalSkills = skills.filter(
+  (s) => !s.category || s.category === "technical"
+);
+```
+
+## Empty State Handling
+
+Sections with no data are not rendered:
+
+```tsx
+{
+  experience.length > 0 && <ExperienceSection experience={experience} />;
+}
+```
+
+## Link Handling
+
+### HTML (CVPreview)
+
+```tsx
+<a href={personalInfo.linkedin} target="_blank" rel="noopener noreferrer">
+  LinkedIn Profile
+</a>
+```
+
+### PDF (PDFDocument)
+
+```tsx
+import { Link } from "@react-pdf/renderer";
+
+<Link src={personalInfo.linkedin}>LinkedIn Profile</Link>;
+```
+
+## Testing Considerations
+
+1. **Visual Consistency**: Ensure HTML preview matches PDF output
+2. **Font Loading**: Verify fonts load correctly in PDF
+3. **Page Breaks**: Test long CVs for proper pagination
+4. **Empty States**: Test with minimal data
+5. **Link Functionality**: Verify clickable links in both formats
+
+## Performance
+
+- **Memoization**: Both components use React.memo
+- **Lazy PDF**: PDF generated only on download
+- **Computed Values**: Section order and filtering cached with useMemo
+- **Conditional Rendering**: Empty sections skipped entirely
+
+## Related Components
+
+- [CVBuilder](/api/components/cv-builder) - Main component using preview
+- [Form Components](/api/components/forms) - Data input
+- [Templates](/api/components/templates) - Template implementations

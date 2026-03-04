@@ -1,0 +1,438 @@
+---
+title: Managing Versions
+description: Save, restore, and organize different versions of your resume with tags and descriptions
+---
+
+CV Builder includes a powerful version control system that lets you save snapshots of your resume, organize them with tags, and restore previous versions at any time.
+
+## Why Use Versions?
+
+Version control helps you:
+- **Maintain multiple resumes** tailored for different job types
+- **Experiment safely** with changes knowing you can revert
+- **Track your progress** over time
+- **Organize variations** by company, industry, or role
+- **Recover from mistakes** by restoring previous versions
+
+<Tip>
+Think of versions as "save points" in a video game—you can always go back to a checkpoint if needed.
+</Tip>
+
+## Creating a Version
+
+<Steps>
+  <Step title="Prepare Your Resume">
+    Make sure your resume is in the state you want to save:
+    - All sections are filled out correctly
+    - Section order is configured
+    - Template is selected
+    - Hidden sections are set appropriately
+  </Step>
+  
+  <Step title="Open Version Manager">
+    Click the "Versions" button in the top navigation bar.
+  </Step>
+  
+  <Step title="Click 'Save New Version'">
+    This opens the version save dialog.
+  </Step>
+  
+  <Step title="Name Your Version">
+    Enter a descriptive name:
+    - "Software Engineer - Google"
+    - "Data Scientist - Tech Companies"
+    - "Senior Developer - 2024"
+    - "Freelance Web Developer"
+    
+    <Tip>
+    Use descriptive names that help you identify the purpose of each version.
+    </Tip>
+  </Step>
+  
+  <Step title="Add Description (Optional)">
+    Include details about what makes this version unique:
+    - Target company or industry
+    - Key sections emphasized
+    - Date created
+    - Specific job posting it's tailored for
+  </Step>
+  
+  <Step title="Add Tags (Optional)">
+    Tags help organize and find versions later:
+    - Job type: `frontend`, `backend`, `fullstack`
+    - Industry: `tech`, `finance`, `healthcare`
+    - Status: `final`, `draft`, `review`
+    - Company: `google`, `microsoft`, `startup`
+  </Step>
+  
+  <Step title="Save">
+    Click "Save Version" to create the snapshot.
+  </Step>
+</Steps>
+
+<Screenshot src="/images/save-version.png" alt="Save Version Dialog" />
+
+## Version Data Structure
+
+Each version stores:
+
+```typescript
+interface CVVersion {
+  id: string;                 // Unique identifier
+  userId: string;             // Owner's user ID
+  data: CVData;               // Complete resume data
+  versionName: string;        // Display name
+  description?: string;       // Optional description
+  tags?: string[];            // Organization tags
+  createdAt: Date;            // Creation timestamp
+  isAutoSave: boolean;        // Auto-saved vs manual save
+}
+```
+
+The `data` field contains your complete resume:
+```typescript
+interface CVData {
+  personalInfo: PersonalInfo;
+  experience: Experience[];
+  education: Education[];
+  projects: Project[];
+  achievements: Achievement[];
+  languages: Language[];
+  skills: Skill[];
+  sectionOrder: SectionId[];
+  references: string;
+  hiddenSections: SectionId[];
+  template?: TemplateId;
+}
+```
+
+## Saving Versions Programmatically
+
+The `saveVersion` function is used internally:
+
+```typescript
+export async function saveVersion(
+  userId: string,
+  data: CVData,
+  input: CVVersionInput,
+  isAutoSave: boolean = false
+): Promise<string | null>
+```
+
+**Parameters:**
+- `userId` - User's Firebase authentication ID
+- `data` - Current CV data to save
+- `input` - Version name, description, and tags
+- `isAutoSave` - Whether this is an automatic save (for backups)
+
+**Returns:**
+- Version ID on success, or `null` on failure
+
+## Viewing Versions
+
+To see all your saved versions:
+
+<Steps>
+  <Step title="Open Versions Panel">
+    Click "Versions" in the navigation menu.
+  </Step>
+  
+  <Step title="Browse the List">
+    Versions are displayed newest-first with:
+    - Version name
+    - Creation date
+    - Tags (if any)
+    - Description preview
+  </Step>
+  
+  <Step title="Filter by Tags">
+    Click a tag to show only versions with that tag.
+  </Step>
+  
+  <Step title="Search Versions">
+    Use the search bar to find versions by name, description, or tags.
+  </Step>
+</Steps>
+
+<Screenshot src="/images/versions-list.png" alt="Versions List" />
+
+### Version List Pagination
+
+Versions load 20 at a time for performance:
+
+```typescript
+const VERSIONS_PAGE_SIZE = 20;
+
+export async function getVersions(
+  userId: string,
+  pageSize: number = VERSIONS_PAGE_SIZE,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{ versions: CVVersionMetadata[]; lastDoc: QueryDocumentSnapshot | null }>
+```
+
+Scroll to the bottom of the list to load more versions automatically.
+
+## Restoring a Version
+
+<Steps>
+  <Step title="Find the Version">
+    Browse or search for the version you want to restore.
+  </Step>
+  
+  <Step title="Click 'Restore'">
+    A confirmation dialog appears.
+  </Step>
+  
+  <Step title="Confirm Restoration">
+    Click "Yes, Restore" to proceed.
+  </Step>
+  
+  <Step title="Auto-Backup Created">
+    Before restoring, CV Builder automatically saves your current resume as a backup:
+    - Name: "Auto-backup before restore"
+    - Tag: `auto-backup`
+    - Description: "Automatic backup created before restoring to version [Name]"
+  </Step>
+  
+  <Step title="Version Applied">
+    The selected version replaces your current resume:
+    - All sections are updated
+    - Section order is restored
+    - Hidden sections are reapplied
+    - Template is changed if different
+  </Step>
+</Steps>
+
+<Warning>
+Restoring a version replaces your current resume completely. However, an automatic backup is always created first, so you can recover your previous state if needed.
+</Warning>
+
+### Restoration Workflow
+
+The restoration process:
+
+```typescript
+export async function restoreVersion(userId: string, versionId: string): Promise<boolean> {
+  // 1. Get the version to restore
+  const version = await getVersion(versionId);
+  if (!version) return false;
+
+  // 2. Backup current CV data first
+  const currentDoc = await fetchCVDocSnapshot(userId);
+  if (currentDoc.exists()) {
+    const currentData = currentDoc.data();
+    await saveVersion(
+      userId,
+      currentData.data as CVData,
+      {
+        versionName: `Auto-backup before restore`,
+        description: `Automatic backup created before restoring to version "${version.versionName}"`,
+        tags: ["auto-backup"],
+      },
+      true  // isAutoSave = true
+    );
+  }
+
+  // 3. Restore the version data
+  await setCVDoc(
+    userId,
+    {
+      data: sanitizeCVDataForFirestore(version.data),
+      updatedAt: serverTimestamp(),
+      currentVersionId: versionId,
+    },
+    true
+  );
+
+  return true;
+}
+```
+
+## Editing Version Metadata
+
+You can update a version's name, description, or tags without changing its content:
+
+<Steps>
+  <Step title="Open Version Options">
+    Click the menu icon (⋮) next to the version.
+  </Step>
+  
+  <Step title="Select 'Edit'">
+    The edit dialog appears.
+  </Step>
+  
+  <Step title="Modify Details">
+    Update the name, description, or tags as needed.
+  </Step>
+  
+  <Step title="Save Changes">
+    Click "Save" to update the version metadata.
+  </Step>
+</Steps>
+
+<Note>
+Editing metadata doesn't change the resume data stored in the version—only its name, description, and tags are updated.
+</Note>
+
+### Update Metadata Function
+
+```typescript
+export async function updateVersionMetadata(
+  versionId: string,
+  metadata: Partial<Pick<CVVersionInput, "versionName" | "description" | "tags">>
+): Promise<boolean>
+```
+
+## Deleting Versions
+
+To delete a version you no longer need:
+
+<Steps>
+  <Step title="Open Version Options">
+    Click the menu icon (⋮) next to the version.
+  </Step>
+  
+  <Step title="Select 'Delete'">
+    A confirmation dialog appears.
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    Click "Yes, Delete" to permanently remove the version.
+  </Step>
+</Steps>
+
+<Warning>
+Deleting a version is permanent and cannot be undone. Make sure you won't need this version in the future.
+</Warning>
+
+## Searching Versions
+
+Find versions quickly using the search feature:
+
+```typescript
+export async function searchVersions(
+  userId: string,
+  searchTerm: string
+): Promise<CVVersionMetadata[]> {
+  const allVersions = await getAllVersions(userId);
+  const lowerSearchTerm = searchTerm.toLowerCase();
+
+  return allVersions.filter((version) => {
+    const matchesName = version.versionName.toLowerCase().includes(lowerSearchTerm);
+    const matchesDescription = version.description?.toLowerCase().includes(lowerSearchTerm);
+    const matchesTags = version.tags?.some((tag) => tag.toLowerCase().includes(lowerSearchTerm));
+
+    return matchesName || matchesDescription || matchesTags;
+  }).slice(0, 200);
+}
+```
+
+Search looks for matches in:
+- Version name
+- Description
+- Tags
+
+## Auto-Save Versions
+
+CV Builder automatically creates backups:
+- **Before restoring** a version
+- **Before major changes** (if configured)
+- Tagged with `auto-backup`
+- Marked with `isAutoSave: true`
+
+Auto-save versions prevent data loss during restore operations.
+
+<Tip>
+You can delete auto-backup versions if they accumulate, but keep at least a few recent ones for safety.
+</Tip>
+
+## Version History Hook
+
+The `useCVVersions` hook manages version operations:
+
+```typescript
+interface UseCVVersionsReturn {
+  // State
+  versions: CVVersionMetadata[];
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  error: string | null;
+
+  // Actions
+  refreshVersions: () => Promise<void>;
+  loadMore: () => Promise<void>;
+  saveNewVersion: (input: CVVersionInput) => Promise<string | null>;
+  getVersionData: (versionId: string) => Promise<CVVersion | null>;
+  restoreToVersion: (versionId: string) => Promise<boolean>;
+  deleteVersionById: (versionId: string) => Promise<boolean>;
+  updateVersion: (versionId: string, metadata: Partial<CVVersionInput>) => Promise<boolean>;
+  searchVersionsList: (searchTerm: string) => Promise<void>;
+  clearSearch: () => Promise<void>;
+
+  // Optimistic UI state
+  isSaving: boolean;
+  isRestoring: boolean;
+  isDeleting: string | null;
+}
+```
+
+## Best Practices
+
+<Tip>
+**Version Management Tips:**
+
+1. **Use descriptive names** - "Frontend Developer - Startup" is better than "Version 1"
+2. **Tag consistently** - Choose a tagging system and stick with it
+3. **Save before major changes** - Create a version before experimenting
+4. **Clean up periodically** - Delete outdated versions you won't use
+5. **Add descriptions** - Future you will thank present you
+6. **One version per application** - Save a version for each job you apply to
+7. **Keep auto-backups** - Don't delete all auto-backup versions
+</Tip>
+
+## Tagging Strategies
+
+### By Job Type
+```
+tags: ["frontend", "react", "senior"]
+tags: ["backend", "python", "mid-level"]
+tags: ["fullstack", "javascript"]
+```
+
+### By Company/Industry
+```
+tags: ["google", "final", "2024"]
+tags: ["startup", "tech", "draft"]
+tags: ["finance", "enterprise"]
+```
+
+### By Status
+```
+tags: ["final", "submitted"]
+tags: ["draft", "review"]
+tags: ["archive", "old"]
+```
+
+## Common Issues
+
+**Version not restoring?**
+- Check your internet connection
+- Verify you have permission to edit the resume
+- Try refreshing the page
+
+**Can't find a version?**
+- Use the search feature
+- Check if you're filtering by a specific tag
+- Scroll down to load more versions
+
+**Auto-backup failed?**
+- The restore will be blocked for safety
+- Save a manual version of your current resume first
+- Then try restoring again
+
+## Next Steps
+
+- [Customize section order](/guide/managing-sections) for different versions
+- [Hide irrelevant sections](/guide/managing-sections) in specific versions
+- [Add profile images](/guide/profile-images) to make versions stand out

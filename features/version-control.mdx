@@ -1,0 +1,541 @@
+---
+title: "Version Control"
+description: "Save, restore, and manage multiple versions of your CV with full version history and metadata"
+---
+
+## Overview
+
+CV Builder includes a comprehensive version control system that allows you to save named snapshots of your CV, view version history, restore previous versions, and manage metadata like tags and descriptions.
+
+<Note>
+Version control is only available for authenticated users. Guest mode users must sign in to access these features.
+</Note>
+
+## Saving Versions
+
+### Create a New Version
+
+Users can save the current CV state as a named version:
+
+```typescript
+// lib/cvService.ts:69-81
+export async function saveVersion(
+  userId: string,
+  data: CVData,
+  input: CVVersionInput,
+  isAutoSave: boolean = false
+): Promise<string | null> {
+  try {
+    return await createVersion(
+      userId, 
+      sanitizeCVDataForFirestore(data), 
+      input, 
+      isAutoSave
+    );
+  } catch (error) {
+    console.error("[cvService] Failed to save version:", error);
+    return null;
+  }
+}
+```
+
+**Version Input Interface:**
+
+```typescript
+// lib/types.ts:194-198
+export interface CVVersionInput {
+  versionName: string;
+  description?: string;
+  tags?: string[];
+}
+```
+
+### UI Implementation
+
+The Save Version dialog is triggered from the header:
+
+```typescript
+// components/cv-builder.tsx:686-697
+<Button
+  variant="outline"
+  size="sm"
+  onClick={() => setShowSaveVersionDialog(true)}
+  title="Save a named version"
+>
+  <GitBranch className="w-4 h-4" />
+  <span className="hidden lg:inline">Save Version</span>
+</Button>
+```
+
+The handler retrieves current form data and saves it:
+
+```typescript
+// components/cv-builder.tsx:420-435
+const handleSaveVersion = async (
+  name: string, 
+  description: string, 
+  tags: string[]
+) => {
+  if (!user) {
+    setShowAuthModal(true);
+    return false;
+  }
+
+  const versionId = await saveNewVersion({ 
+    versionName: name, 
+    description, 
+    tags 
+  });
+
+  if (versionId) {
+    toast({ title: "Version saved successfully!", type: "success" });
+    return true;
+  }
+}
+```
+
+## Version Data Structure
+
+### Version Metadata
+
+For performance, version lists only load metadata:
+
+```typescript
+// lib/types.ts:184-192
+export interface CVVersionMetadata {
+  id: string;
+  userId: string;
+  versionName: string;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  isAutoSave: boolean;
+}
+```
+
+### Full Version Object
+
+When viewing or restoring, full data is loaded:
+
+```typescript
+// lib/types.ts:173-182
+export interface CVVersion {
+  id: string;
+  userId: string;
+  data: CVData;              // Full CV data snapshot
+  versionName: string;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  isAutoSave: boolean;
+}
+```
+
+## Viewing Version History
+
+### Pagination
+
+Version history loads in pages of 20:
+
+```typescript
+// lib/cvService.ts:38
+const VERSIONS_PAGE_SIZE = 20;
+
+// lib/cvService.ts:86-98
+export async function getVersions(
+  userId: string,
+  pageSize: number = VERSIONS_PAGE_SIZE,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{ 
+  versions: CVVersionMetadata[]; 
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null 
+}> {
+  try {
+    return await fetchVersionsPage(userId, pageSize, lastDoc);
+  } catch (error) {
+    console.error("[cvService] Failed to get versions:", error);
+    return { versions: [], lastDoc: null };
+  }
+}
+```
+
+### Infinite Scroll
+
+The version history modal supports infinite scrolling:
+
+```typescript
+// hooks/useCVVersions.ts:88-112
+const loadMore = useCallback(async () => {
+  if (!userId || isLoadingMore || !hasMore || isSearchingRef.current) return;
+
+  setIsLoadingMore(true);
+
+  try {
+    const { versions: newVersions, lastDoc } = await getVersions(
+      userId,
+      20,
+      lastDocRef.current || undefined
+    );
+
+    if (newVersions.length > 0) {
+      setVersions((prev) => [...prev, ...newVersions]);
+      lastDocRef.current = lastDoc;
+      setHasMore(newVersions.length === 20);
+    } else {
+      setHasMore(false);
+    }
+  } catch (err) {
+    console.error("Failed to load more versions:", err);
+  } finally {
+    setIsLoadingMore(false);
+  }
+}, [userId, isLoadingMore, hasMore]);
+```
+
+### Version History Modal
+
+```tsx
+// components/cv-builder.tsx:543-559
+<VersionHistoryModal
+  isOpen={showVersionHistory}
+  onClose={() => setShowVersionHistory(false)}
+  versions={versions}
+  isLoading={versionsLoading}
+  isLoadingMore={isLoadingMore}
+  hasMore={hasMore}
+  isRestoring={isRestoringVersion}
+  isDeleting={isDeletingVersion}
+  onLoadMore={loadMore}
+  onView={handleViewVersion}
+  onRestore={handleRestoreVersion}
+  onDelete={handleDeleteVersion}
+  onUpdateMetadata={handleUpdateVersionName}
+  onSearch={searchVersionsList}
+  onClearSearch={clearSearch}
+/>
+```
+
+## Restoring Versions
+
+### Restore Process
+
+Restoring a version follows these steps:
+
+<Steps>
+  <Step title="Create Auto-Backup">
+    Current CV is automatically saved as a backup version before restoring
+  </Step>
+  <Step title="Fetch Version Data">
+    Full version data is retrieved from Firestore
+  </Step>
+  <Step title="Update Main CV">
+    Version data replaces the current CV document
+  </Step>
+  <Step title="Update Form State">
+    React Hook Form is reset with restored data
+  </Step>
+</Steps>
+
+**Implementation:**
+
+```typescript
+// lib/cvService.ts:128-175
+export async function restoreVersion(
+  userId: string, 
+  versionId: string
+): Promise<boolean> {
+  try {
+    // Get the version to restore
+    const version = await getVersion(versionId);
+    if (!version) {
+      console.error("Version not found:", versionId);
+      return false;
+    }
+
+    // First, backup the current CV data
+    const currentDoc = await fetchCVDocSnapshot(userId);
+
+    if (currentDoc.exists()) {
+      const currentData = currentDoc.data();
+      const backupVersionId = await saveVersion(
+        userId,
+        currentData.data as CVData,
+        {
+          versionName: `Auto-backup before restore`,
+          description: `Automatic backup created before restoring to version "${version.versionName}"`,
+          tags: ["auto-backup"],
+        },
+        true  // isAutoSave = true
+      );
+
+      if (!backupVersionId) {
+        console.error("Failed to create pre-restore backup");
+        return false;
+      }
+    }
+
+    // Restore the version data
+    await setCVDoc(
+      userId,
+      {
+        data: sanitizeCVDataForFirestore(version.data),
+        updatedAt: serverTimestamp(),
+        currentVersionId: versionId,
+      },
+      true  // merge = true
+    );
+
+    return true;
+  } catch (error) {
+    console.error("Failed to restore version:", error);
+    return false;
+  }
+}
+```
+
+### UI Handler
+
+```typescript
+// components/cv-builder.tsx:447-461
+const handleRestoreVersion = async (versionId: string) => {
+  const success = await restoreToVersion(versionId);
+  if (success) {
+    const { loadCV } = await import("@/lib/cvService");
+    const restoredData = await loadCV(user!.uid);
+    if (restoredData) {
+      methods.reset(restoredData);
+    }
+    toast({ title: "Version restored successfully!", type: "success" });
+    return true;
+  } else {
+    toast({ title: "Failed to restore version", type: "error" });
+    return false;
+  }
+};
+```
+
+<Warning>
+Restoring a version creates an auto-backup of your current state. Look for versions tagged with "auto-backup" to recover your pre-restore state if needed.
+</Warning>
+
+## Deleting Versions
+
+```typescript
+// lib/cvService.ts:180-187
+export async function deleteVersion(versionId: string): Promise<boolean> {
+  try {
+    await deleteVersionById(versionId);
+    return true;
+  } catch (error) {
+    console.error("Failed to delete version:", error);
+    return false;
+  }
+}
+```
+
+**UI Handler:**
+
+```typescript
+// components/cv-builder.tsx:463-471
+const handleDeleteVersion = async (versionId: string) => {
+  const success = await deleteVersionById(versionId);
+  if (success) {
+    toast({ title: "Version deleted", type: "success" });
+  } else {
+    toast({ title: "Failed to delete version", type: "error" });
+  }
+  return success;
+};
+```
+
+## Updating Version Metadata
+
+Users can edit version names, descriptions, and tags:
+
+```typescript
+// lib/cvService.ts:193-216
+export async function updateVersionMetadata(
+  versionId: string,
+  metadata: Partial<Pick<CVVersionInput, "versionName" | "description" | "tags">>
+): Promise<boolean> {
+  try {
+    const updateData: Record<string, unknown> = {};
+
+    if (metadata.versionName !== undefined) {
+      updateData.versionName = metadata.versionName;
+    }
+    if (metadata.description !== undefined) {
+      updateData.description = metadata.description;
+    }
+    if (metadata.tags !== undefined) {
+      updateData.tags = metadata.tags;
+    }
+
+    await updateVersionById(versionId, updateData);
+    return true;
+  } catch (error) {
+    console.error("Failed to update version metadata:", error);
+    return false;
+  }
+}
+```
+
+## Searching Versions
+
+Search across version names, descriptions, and tags:
+
+```typescript
+// lib/cvService.ts:221-242
+export async function searchVersions(
+  userId: string,
+  searchTerm: string
+): Promise<CVVersionMetadata[]> {
+  try {
+    // Get all versions (Firestore doesn't support text search natively)
+    const allVersions = await getAllVersions(userId);
+
+    const lowerSearchTerm = searchTerm.toLowerCase();
+
+    return allVersions.filter((version) => {
+      const matchesName = version.versionName.toLowerCase()
+        .includes(lowerSearchTerm);
+      const matchesDescription = version.description?.toLowerCase()
+        .includes(lowerSearchTerm);
+      const matchesTags = version.tags?.some((tag) => 
+        tag.toLowerCase().includes(lowerSearchTerm)
+      );
+
+      return matchesName || matchesDescription || matchesTags;
+    }).slice(0, 200);  // Limit to 200 results
+  }
+}
+```
+
+<Info>
+Search is client-side and limited to 200 results for performance. For large version histories, use tags to organize versions.
+</Info>
+
+## Auto-Save Versions
+
+When restoring a version, an automatic backup is created:
+
+```typescript
+// lib/cvService.ts:142-151
+const backupVersionId = await saveVersion(
+  userId,
+  currentData.data as CVData,
+  {
+    versionName: `Auto-backup before restore`,
+    description: `Automatic backup created before restoring to version "${version.versionName}"`,
+    tags: ["auto-backup"],
+  },
+  true  // isAutoSave parameter
+);
+```
+
+Auto-saved versions are marked with `isAutoSave: true` and can be filtered in the UI.
+
+## Version Hook
+
+The `useCVVersions` hook provides all version control functionality:
+
+```typescript
+// hooks/useCVVersions.ts:46-195
+export function useCVVersions({ userId }: UseCVVersionsOptions) {
+  const { getValues } = useFormContext<CVData>();
+
+  const [versions, setVersions] = useState<CVVersionMetadata[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  return {
+    // State
+    versions,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    isSaving,
+    isRestoring,
+    isDeleting,
+
+    // Actions
+    refreshVersions,
+    loadMore,
+    saveNewVersion,
+    getVersionData,
+    restoreToVersion,
+    deleteVersionById,
+    updateVersion,
+    searchVersionsList,
+    clearSearch,
+  };
+}
+```
+
+## Preview Modal
+
+Before restoring, users can preview a version:
+
+```tsx
+// components/cv-builder.tsx:561-571
+<VersionPreviewModal
+  isOpen={showVersionPreview}
+  onClose={() => {
+    setShowVersionPreview(false);
+    setPreviewingVersion(null);
+  }}
+  version={previewingVersion}
+  isLoading={false}
+  isRestoring={isRestoringVersion}
+  onRestore={() => 
+    previewingVersion ? handleRestoreVersion(previewingVersion.id) : Promise.resolve(false)
+  }
+/>
+```
+
+**View Handler:**
+
+```typescript
+// components/cv-builder.tsx:437-445
+const handleViewVersion = async (versionId: string) => {
+  const version = await getVersionData(versionId);
+  if (version) {
+    setPreviewingVersion(version);
+    setShowVersionPreview(true);
+  } else {
+    toast({ title: "Failed to load version", type: "error" });
+  }
+};
+```
+
+## Best Practices
+
+<Accordion title="Version Naming Conventions">
+Use descriptive names that indicate the purpose or context:
+- "Pre-interview with Company X"
+- "Final draft 2024"
+- "Software Engineer focus"
+- "Removed project Y"
+</Accordion>
+
+<Accordion title="Using Tags Effectively">
+Organize versions with tags:
+- `final` - Final versions ready to send
+- `draft` - Work in progress
+- `archived` - Old versions to keep for reference
+- `company-specific` - Customized for specific applications
+- `auto-backup` - System-generated backups
+</Accordion>
+
+<Accordion title="When to Create Versions">
+Create versions at key milestones:
+- Before major edits
+- Before customizing for a specific job
+- After receiving feedback
+- Before switching templates
+- Final versions sent to employers
+</Accordion>

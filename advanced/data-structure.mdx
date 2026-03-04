@@ -1,0 +1,520 @@
+---
+title: 'Data Structure'
+description: 'Complete TypeScript type definitions for CV Builder data models'
+icon: 'database'
+---
+
+## Overview
+
+CV Builder uses a strongly-typed data structure defined in `lib/types.ts`. All resume data is stored as a single `CVData` object containing personal information, experience, education, and other sections.
+
+## Core Data Type
+
+The main data structure that represents a complete resume:
+
+```typescript lib/types.ts
+export interface CVData {
+  personalInfo: PersonalInfo;
+  experience: Experience[];
+  education: Education[];
+  projects: Project[];
+  achievements: Achievement[];
+  languages: Language[];
+  skills: Skill[];
+  sectionOrder: SectionId[];
+  references: string;
+  hiddenSections: SectionId[];
+  template?: TemplateId;
+}
+```
+
+<ParamField path="personalInfo" type="PersonalInfo" required>
+  User's personal contact information and profile
+</ParamField>
+
+<ParamField path="experience" type="Experience[]" required>
+  Array of work experience entries
+</ParamField>
+
+<ParamField path="education" type="Education[]" required>
+  Array of education entries
+</ParamField>
+
+<ParamField path="projects" type="Project[]" required>
+  Array of personal or professional projects
+</ParamField>
+
+<ParamField path="achievements" type="Achievement[]" required>
+  Array of awards, certifications, or achievements
+</ParamField>
+
+<ParamField path="languages" type="Language[]" required>
+  Array of languages with proficiency levels
+</ParamField>
+
+<ParamField path="skills" type="Skill[]" required>
+  Array of technical and professional skills
+</ParamField>
+
+<ParamField path="sectionOrder" type="SectionId[]" required>
+  Order in which sections appear in the resume
+</ParamField>
+
+<ParamField path="references" type="string" required>
+  References text (e.g., "Available upon request")
+</ParamField>
+
+<ParamField path="hiddenSections" type="SectionId[]" required>
+  Sections hidden from preview and PDF export
+</ParamField>
+
+<ParamField path="template" type="TemplateId">
+  Selected resume template ('default' | 'rhyhorn' | 'nexus')
+</ParamField>
+
+## Section Types
+
+### PersonalInfo
+
+Personal contact information and profile:
+
+```typescript lib/types.ts
+export interface PersonalInfo {
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  jobTitle: string;
+  summary: string;
+  website?: string;
+  linkedin?: string;
+  github?: string;
+  profileImageUrl?: string;
+}
+```
+
+<ResponseField name="fullName" type="string" required>
+  Full name of the person
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  Email address
+</ResponseField>
+
+<ResponseField name="phone" type="string" required>
+  Phone number
+</ResponseField>
+
+<ResponseField name="address" type="string" required>
+  Physical address or location
+</ResponseField>
+
+<ResponseField name="jobTitle" type="string" required>
+  Current or desired job title
+</ResponseField>
+
+<ResponseField name="summary" type="string" required>
+  Professional summary or bio
+</ResponseField>
+
+<ResponseField name="website" type="string">
+  Personal website URL
+</ResponseField>
+
+<ResponseField name="linkedin" type="string">
+  LinkedIn profile URL
+</ResponseField>
+
+<ResponseField name="github" type="string">
+  GitHub profile URL
+</ResponseField>
+
+<ResponseField name="profileImageUrl" type="string">
+  URL to profile image (Firebase Storage URL)
+</ResponseField>
+
+### Experience
+
+Work experience entries:
+
+```typescript lib/types.ts
+export interface Experience {
+  id: string;
+  company: string;
+  role: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  description: string;
+}
+```
+
+<ResponseField name="id" type="string" required>
+  Unique identifier (generated with nanoid)
+</ResponseField>
+
+<ResponseField name="company" type="string" required>
+  Company or organization name
+</ResponseField>
+
+<ResponseField name="role" type="string" required>
+  Job title or position
+</ResponseField>
+
+<ResponseField name="startDate" type="string" required>
+  Start date (ISO string or formatted)
+</ResponseField>
+
+<ResponseField name="endDate" type="string" required>
+  End date (ISO string or formatted)
+</ResponseField>
+
+<ResponseField name="current" type="boolean" required>
+  Whether this is the current position
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Job responsibilities and achievements
+</ResponseField>
+
+### Education
+
+Education entries:
+
+```typescript lib/types.ts
+export interface Education {
+  id: string;
+  school: string;
+  degree: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+}
+```
+
+<ResponseField name="id" type="string" required>
+  Unique identifier
+</ResponseField>
+
+<ResponseField name="school" type="string" required>
+  School or institution name
+</ResponseField>
+
+<ResponseField name="degree" type="string" required>
+  Degree or qualification obtained
+</ResponseField>
+
+<ResponseField name="startDate" type="string" required>
+  Start date
+</ResponseField>
+
+<ResponseField name="endDate" type="string" required>
+  End date or expected graduation
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Additional details, honors, or coursework
+</ResponseField>
+
+### Project
+
+Project entries:
+
+```typescript lib/types.ts
+export interface Project {
+  id: string;
+  title: string;
+  date: string;
+  techStack: string; // "Skill: React, ..."
+  description: string;
+}
+```
+
+<ResponseField name="id" type="string" required>
+  Unique identifier
+</ResponseField>
+
+<ResponseField name="title" type="string" required>
+  Project name
+</ResponseField>
+
+<ResponseField name="date" type="string" required>
+  Project date or date range
+</ResponseField>
+
+<ResponseField name="techStack" type="string" required>
+  Technologies used (comma-separated)
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Project description and outcomes
+</ResponseField>
+
+### Achievement
+
+Award or achievement entries:
+
+```typescript lib/types.ts
+export interface Achievement {
+  id: string;
+  title: string;
+  organization: string;
+  date: string;
+}
+```
+
+<ResponseField name="id" type="string" required>
+  Unique identifier
+</ResponseField>
+
+<ResponseField name="title" type="string" required>
+  Achievement or award title
+</ResponseField>
+
+<ResponseField name="organization" type="string" required>
+  Issuing organization
+</ResponseField>
+
+<ResponseField name="date" type="string" required>
+  Date received
+</ResponseField>
+
+### Language
+
+Language proficiency entries:
+
+```typescript lib/types.ts
+export interface Language {
+  id: string;
+  name: string;
+  proficiency: string; // "Native", "Fluent", etc.
+}
+```
+
+<ResponseField name="id" type="string" required>
+  Unique identifier
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Language name
+</ResponseField>
+
+<ResponseField name="proficiency" type="string" required>
+  Proficiency level (e.g., "Native", "Fluent", "Intermediate")
+</ResponseField>
+
+### Skill
+
+Skill entries:
+
+```typescript lib/types.ts
+export interface Skill {
+  id: string;
+  name: string;
+  description?: string; // The skill values like "C, C++, Java, Python"
+  category?: 'technical' | 'professional';
+}
+```
+
+<ResponseField name="id" type="string" required>
+  Unique identifier
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Skill category name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Comma-separated list of specific skills
+</ResponseField>
+
+<ResponseField name="category" type="'technical' | 'professional'">
+  Skill category type
+</ResponseField>
+
+## Section Management
+
+### SectionId Type
+
+Available resume sections:
+
+```typescript lib/types.ts
+export type SectionId =
+  | "personal"
+  | "experience"
+  | "education"
+  | "projects"
+  | "achievements"
+  | "languages"
+  | "skills"
+  | "references";
+```
+
+### Default Section Order
+
+```typescript lib/types.ts
+export const defaultSectionOrder: SectionId[] = [
+  "personal",
+  "skills",
+  "experience",
+  "education",
+  "projects",
+  "achievements",
+  "languages",
+  "references",
+];
+```
+
+## Version Control Types
+
+### CVVersion
+
+Saved version of a resume:
+
+```typescript lib/types.ts
+export interface CVVersion {
+  id: string;
+  userId: string;
+  data: CVData;
+  versionName: string;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  isAutoSave: boolean;
+}
+```
+
+### CVDocument
+
+Firestore document structure:
+
+```typescript lib/types.ts
+export interface CVDocument {
+  data: CVData;
+  updatedAt: Date;
+  createdAt: Date;
+  currentVersionId?: string;
+}
+```
+
+## Merge Types
+
+Types used for conflict resolution during sync:
+
+### FieldConflict
+
+```typescript lib/types.ts
+export interface FieldConflict {
+  section: SectionId | 'sectionOrder' | 'hiddenSections' | 'template' | 'references';
+  field?: string;  // For nested fields like personalInfo.fullName, or item ID for arrays
+  localValue: unknown;
+  serverValue: unknown;
+  baseValue: unknown;
+  description?: string; // Human-readable description of the conflict
+}
+```
+
+<ResponseField name="section" type="string" required>
+  Section where the conflict occurred
+</ResponseField>
+
+<ResponseField name="field" type="string">
+  Specific field name or item ID
+</ResponseField>
+
+<ResponseField name="localValue" type="unknown" required>
+  Value from local (browser) storage
+</ResponseField>
+
+<ResponseField name="serverValue" type="unknown" required>
+  Value from Firebase server
+</ResponseField>
+
+<ResponseField name="baseValue" type="unknown" required>
+  Value from last sync (common ancestor)
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Human-readable conflict description
+</ResponseField>
+
+### MergeResult
+
+```typescript lib/types.ts
+export interface MergeResult {
+  merged: CVData;
+  conflicts: FieldConflict[];
+  hasConflicts: boolean;
+}
+```
+
+<ResponseField name="merged" type="CVData" required>
+  Merged resume data
+</ResponseField>
+
+<ResponseField name="conflicts" type="FieldConflict[]" required>
+  Array of detected conflicts
+</ResponseField>
+
+<ResponseField name="hasConflicts" type="boolean" required>
+  Whether any conflicts were detected
+</ResponseField>
+
+## Initial Data
+
+The default empty resume structure:
+
+```typescript lib/types.ts
+export const initialCVData: CVData = {
+  personalInfo: {
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
+    jobTitle: "",
+    summary: "",
+    linkedin: "",
+    github: "",
+    website: "",
+    profileImageUrl: "",
+  },
+  experience: [],
+  education: [],
+  projects: [],
+  achievements: [],
+  languages: [],
+  skills: [],
+  sectionOrder: [...defaultSectionOrder],
+  references: "Available upon request.",
+  hiddenSections: [],
+  template: 'default',
+};
+```
+
+## Usage Example
+
+```typescript
+import { CVData, initialCVData } from '@/lib/types';
+
+// Create a new resume
+const myResume: CVData = {
+  ...initialCVData,
+  personalInfo: {
+    ...initialCVData.personalInfo,
+    fullName: "John Doe",
+    email: "john@example.com",
+    jobTitle: "Software Engineer",
+  },
+  experience: [
+    {
+      id: "exp_1",
+      company: "Tech Corp",
+      role: "Senior Developer",
+      startDate: "2020-01",
+      endDate: "2024-03",
+      current: true,
+      description: "Led development of core features",
+    },
+  ],
+};
+```

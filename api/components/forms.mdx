@@ -1,0 +1,477 @@
+---
+title: Form Components
+description: Individual form components for editing CV sections with validation and drag-and-drop reordering
+---
+
+## Overview
+
+Form components provide the user interface for editing different sections of a CV. Each form component handles its own section of the `CVData` structure using React Hook Form.
+
+## Source Files
+
+- **PersonalDetailsForm**: `components/forms/PersonalDetailsForm.tsx`
+- **ExperienceForm**: `components/forms/ExperienceForm.tsx`
+- **EducationForm**: `components/forms/EducationForm.tsx`
+- **ProjectsForm**: `components/forms/ProjectsForm.tsx`
+- **SkillsForm**: `components/forms/SkillsForm.tsx`
+- **AchievementsForm**: `components/forms/AchievementsForm.tsx`
+- **LanguagesForm**: `components/forms/LanguagesForm.tsx`
+- **ReferencesForm**: `components/forms/ReferencesForm.tsx`
+
+## Common Patterns
+
+All form components follow consistent patterns:
+
+1. **Form Context**: Access form methods via `useFormContext<CVData>()`
+2. **Field Arrays**: List-based sections use `useFieldArray` for dynamic items
+3. **Controllers**: Form fields wrapped in `Controller` for controlled components
+4. **Section Visibility**: Check `hiddenSections` to determine if section is hidden
+5. **Drag & Drop**: Reorderable items use Framer Motion's `Reorder` components
+
+## PersonalDetailsForm
+
+Edits personal information and professional summary.
+
+### Usage
+
+```tsx
+import { PersonalDetailsForm } from "@/components/forms/PersonalDetailsForm";
+
+<PersonalDetailsForm template="rhyhorn" />;
+```
+
+### Props
+
+<ParamField path="template" type="TemplateId" required>
+  Current template ID to determine feature availability (e.g., profile image support)
+</ParamField>
+
+### Fields
+
+The form manages the following fields under `personalInfo`:
+
+<ParamField path="fullName" type="string" required>
+  User's full name
+</ParamField>
+
+<ParamField path="jobTitle" type="string" required>
+  Professional job title or desired position
+</ParamField>
+
+<ParamField path="email" type="string">
+  Email address
+</ParamField>
+
+<ParamField path="phone" type="string">
+  Phone number
+</ParamField>
+
+<ParamField path="address" type="string">
+  Location or full address
+</ParamField>
+
+<ParamField path="linkedin" type="string">
+  LinkedIn profile URL
+</ParamField>
+
+<ParamField path="github" type="string">
+  GitHub profile URL
+</ParamField>
+
+<ParamField path="website" type="string">
+  Personal website or portfolio URL
+</ParamField>
+
+<ParamField path="summary" type="string">
+  Professional summary or career objective (multi-line text)
+</ParamField>
+
+<ParamField path="profileImageUrl" type="string">
+  Profile image URL (only shown for templates that support profile images)
+</ParamField>
+
+### Profile Image Support
+
+Profile image upload is conditionally rendered based on template capabilities:
+
+```tsx
+const supportsProfileImage =
+  profileImageEnabledTemplates.includes(template) &&
+  getTemplateById(template).supportsProfileImage;
+```
+
+Currently supported templates: `rhyhorn`, `nexus`
+
+### Example
+
+```tsx
+<Controller
+  control={control}
+  name="personalInfo.fullName"
+  render={({ field: { value, onChange } }) => (
+    <Input
+      value={value || ""}
+      onChange={onChange}
+      placeholder="TARIQ AHMAD"
+    />
+  )}
+/>
+```
+
+## ExperienceForm
+
+Manages work experience entries with collapsible items.
+
+### Usage
+
+```tsx
+import { ExperienceForm } from "@/components/forms/ExperienceForm";
+
+<ExperienceForm />;
+```
+
+### Props
+
+No props required. Uses form context.
+
+### Fields
+
+Each experience item contains:
+
+<ParamField path="id" type="string">
+  Unique identifier (auto-generated)
+</ParamField>
+
+<ParamField path="company" type="string">
+  Company or organization name
+</ParamField>
+
+<ParamField path="role" type="string">
+  Job title or role
+</ParamField>
+
+<ParamField path="startDate" type="string">
+  Start date (format: MM/YYYY)
+</ParamField>
+
+<ParamField path="endDate" type="string">
+  End date (format: MM/YYYY or "Present")
+</ParamField>
+
+<ParamField path="current" type="boolean">
+  Whether this is the current position
+</ParamField>
+
+<ParamField path="description" type="string">
+  Job responsibilities and achievements (multi-line, bullet points supported)
+</ParamField>
+
+### Features
+
+- **Drag & Drop**: Reorder items using drag handle
+- **Collapsible**: Items can be expanded/collapsed
+- **Auto-expand**: New items automatically expand
+- **Empty State**: Shows helpful message when no items exist
+
+### Reordering
+
+```tsx
+const { fields, append, remove, move } = useFieldArray({
+  control,
+  name: "experience",
+  keyName: "_id",
+});
+
+const handleReorder = (newOrder: typeof fields) =>
+  handleFieldArrayReorder(fields, newOrder, move);
+```
+
+## EducationForm
+
+Manages education and certification entries.
+
+### Usage
+
+```tsx
+import { EducationForm } from "@/components/forms/EducationForm";
+
+<EducationForm />;
+```
+
+### Fields
+
+Each education item contains:
+
+<ParamField path="id" type="string">
+  Unique identifier (auto-generated)
+</ParamField>
+
+<ParamField path="school" type="string">
+  School or university name
+</ParamField>
+
+<ParamField path="degree" type="string">
+  Degree, diploma, or certification name
+</ParamField>
+
+<ParamField path="startDate" type="string">
+  Start date (format: MM/YYYY)
+</ParamField>
+
+<ParamField path="endDate" type="string">
+  End date or expected graduation (format: MM/YYYY)
+</ParamField>
+
+<ParamField path="description" type="string">
+  Additional details (optional)
+</ParamField>
+
+### Example
+
+```tsx
+append({
+  id: generateId(),
+  school: "",
+  degree: "",
+  startDate: "",
+  endDate: "",
+  description: "",
+});
+```
+
+## ProjectsForm
+
+Showcase personal or professional projects.
+
+### Usage
+
+```tsx
+import { ProjectsForm } from "@/components/forms/ProjectsForm";
+
+<ProjectsForm />;
+```
+
+### Fields
+
+Each project item contains:
+
+<ParamField path="id" type="string">
+  Unique identifier (auto-generated)
+</ParamField>
+
+<ParamField path="title" type="string">
+  Project name or title
+</ParamField>
+
+<ParamField path="date" type="string">
+  Project date or time period
+</ParamField>
+
+<ParamField path="techStack" type="string">
+  Technologies used (displayed as "Skill: ..." in CV)
+</ParamField>
+
+<ParamField path="description" type="string">
+  Project description and outcomes
+</ParamField>
+
+## SkillsForm
+
+Manage technical and professional skills.
+
+### Usage
+
+```tsx
+import { SkillsForm } from "@/components/forms/SkillsForm";
+
+<SkillsForm />;
+```
+
+### Fields
+
+Each skill item contains:
+
+<ParamField path="id" type="string">
+  Unique identifier (auto-generated)
+</ParamField>
+
+<ParamField path="name" type="string">
+  Skill name or category (e.g., "Programming Languages")
+</ParamField>
+
+<ParamField path="description" type="string">
+  Skill values or details (e.g., "JavaScript, Python, Java")
+</ParamField>
+
+<ParamField path="category" type="'technical' | 'professional'">
+  Skill category:
+  - `technical`: Technical skills
+  - `professional`: Professional attributes
+</ParamField>
+
+### Category Selection
+
+```tsx
+<select>
+  <option value="technical">Technical Skill</option>
+  <option value="professional">Professional Attribute</option>
+</select>
+```
+
+Skills are grouped by category in the CV preview.
+
+## AchievementsForm
+
+Track awards, certifications, and recognition.
+
+### Usage
+
+```tsx
+import { AchievementsForm } from "@/components/forms/AchievementsForm";
+
+<AchievementsForm />;
+```
+
+### Fields
+
+Each achievement item contains:
+
+<ParamField path="id" type="string">
+  Unique identifier (auto-generated)
+</ParamField>
+
+<ParamField path="title" type="string">
+  Achievement or award title
+</ParamField>
+
+<ParamField path="organization" type="string">
+  Issuing organization or institution
+</ParamField>
+
+<ParamField path="date" type="string">
+  Date received or achieved
+</ParamField>
+
+## LanguagesForm
+
+List languages and proficiency levels.
+
+### Usage
+
+```tsx
+import { LanguagesForm } from "@/components/forms/LanguagesForm";
+
+<LanguagesForm />;
+```
+
+### Fields
+
+Each language item contains:
+
+<ParamField path="id" type="string">
+  Unique identifier (auto-generated)
+</ParamField>
+
+<ParamField path="name" type="string">
+  Language name
+</ParamField>
+
+<ParamField path="proficiency" type="string">
+  Proficiency level (e.g., "Native", "Fluent", "Conversational")
+</ParamField>
+
+## ReferencesForm
+
+Simple text field for references section.
+
+### Usage
+
+```tsx
+import { ReferencesForm } from "@/components/forms/ReferencesForm";
+
+<ReferencesForm />;
+```
+
+### Fields
+
+<ParamField path="references" type="string">
+  References text (typically "Available upon request" or contact details)
+</ParamField>
+
+## Shared Components
+
+### FormSectionCard
+
+All form components are wrapped in `FormSectionCard` for consistent styling:
+
+```tsx
+<FormSectionCard
+  title="Work Experience"
+  subtitle="Your professional journey"
+  icon={Briefcase}
+  accentClassName="bg-gradient-to-r from-blue-500 to-cyan-500"
+  iconWrapperClassName="bg-gradient-to-br from-blue-500/10 to-cyan-500/10"
+  iconClassName="text-blue-600 dark:text-blue-400"
+  contentClassName="space-y-4"
+  isHidden={isHidden}
+>
+  {/* Form content */}
+</FormSectionCard>
+```
+
+### Collapsible Items
+
+List-based forms use a common collapsible item pattern:
+
+```tsx
+function ExperienceItem({ field, index, isExpanded, onToggle }) {
+  return (
+    <Reorder.Item value={field}>
+      {/* Header - Always visible */}
+      <div onClick={onToggle}>{/* Title */}</div>
+
+      {/* Expandable Content */}
+      <AnimatePresence>
+        {isExpanded && <motion.div>{/* Form fields */}</motion.div>}
+      </AnimatePresence>
+    </Reorder.Item>
+  );
+}
+```
+
+## Validation
+
+Forms use React Hook Form's built-in validation:
+
+```tsx
+<Controller
+  control={control}
+  name="personalInfo.email"
+  rules={{
+    pattern: {
+      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+      message: "Invalid email address",
+    },
+  }}
+  render={({ field, fieldState: { error } }) => (
+    <>
+      <Input {...field} />
+      {error && <span>{error.message}</span>}
+    </>
+  )}
+/>
+```
+
+## Accessibility
+
+- **Labels**: All form fields have associated labels
+- **Required Fields**: Marked with asterisk and aria-required
+- **Error Messages**: Announced to screen readers
+- **Keyboard Navigation**: Full keyboard support for all interactions
+- **Focus Management**: Focus moves to fields when sections expand
+
+## Related Components
+
+- [CVBuilder](/api/components/cv-builder) - Main component that uses these forms
+- [Preview Components](/api/components/preview) - Display formatted CV data
+- [Templates](/api/components/templates) - Template-specific rendering

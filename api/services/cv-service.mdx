@@ -1,0 +1,586 @@
+---
+title: "CV Service"
+description: "Core service for managing CV data, version control, and backup operations"
+---
+
+The CV Service provides the main API for managing CV data in Firestore, including CRUD operations, version control, and backup management.
+
+## Overview
+
+The service handles:
+- CV data persistence to Firestore
+- Version control with named snapshots
+- Automatic backup creation and cleanup
+- Resume list metadata with statistics
+- Data validation and sanitization
+
+**Source:** `lib/cvService.ts:418`
+
+## CV Data Operations
+
+### saveCV
+
+Saves CV data to Firestore, creating or updating the user's CV document.
+
+```typescript
+async function saveCV(userId: string, data: CVData): Promise<void>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ParamField path="data" type="CVData" required>
+  The complete CV data object to save
+</ParamField>
+
+**Behavior:**
+- Sanitizes data to replace undefined values (Firestore rejects undefined)
+- Updates `updatedAt` timestamp automatically
+- Creates document with `createdAt` if it doesn't exist
+- Validates data structure before saving
+
+**Example:**
+```typescript
+import { saveCV } from '@/lib/cvService';
+import { CVData } from '@/lib/types';
+
+const cvData: CVData = {
+  personalInfo: {
+    fullName: 'John Doe',
+    email: 'john@example.com',
+    // ... other fields
+  },
+  experience: [],
+  education: [],
+  // ... other sections
+};
+
+await saveCV(userId, cvData);
+```
+
+---
+
+### loadCV
+
+Loads CV data from Firestore with validation and sanitization.
+
+```typescript
+async function loadCV(userId: string): Promise<CVData | null>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ResponseField name="return" type="CVData | null">
+  Returns validated CV data with defaults filled in, or null if document doesn't exist or validation fails
+</ResponseField>
+
+**Behavior:**
+- Validates loaded data using Zod schema
+- Deep merges with initial values to ensure all fields are present
+- Returns null if document doesn't exist or data is invalid
+- Logs warning if validation fails
+
+**Example:**
+```typescript
+const cvData = await loadCV(userId);
+
+if (cvData) {
+  console.log('CV loaded:', cvData.personalInfo.fullName);
+} else {
+  console.log('No CV found or invalid data');
+}
+```
+
+---
+
+### deleteCV
+
+Deletes a user's CV document from Firestore.
+
+```typescript
+async function deleteCV(userId: string): Promise<void>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+**Example:**
+```typescript
+await deleteCV(userId);
+console.log('CV deleted successfully');
+```
+
+---
+
+## Version Control Operations
+
+### saveVersion
+
+Saves a named version snapshot of the CV.
+
+```typescript
+async function saveVersion(
+  userId: string,
+  data: CVData,
+  input: CVVersionInput,
+  isAutoSave: boolean = false
+): Promise<string | null>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ParamField path="data" type="CVData" required>
+  The CV data to save as a version
+</ParamField>
+
+<ParamField path="input" type="CVVersionInput" required>
+  Version metadata including name, description, and tags
+</ParamField>
+
+<ParamField path="isAutoSave" type="boolean" default="false">
+  Whether this is an automatic backup version
+</ParamField>
+
+<ResponseField name="return" type="string | null">
+  Returns the version ID if successful, null on failure
+</ResponseField>
+
+**CVVersionInput Interface:**
+```typescript
+interface CVVersionInput {
+  versionName: string;
+  description?: string;
+  tags?: string[];
+}
+```
+
+**Example:**
+```typescript
+const versionId = await saveVersion(
+  userId,
+  cvData,
+  {
+    versionName: 'Software Engineer Application',
+    description: 'Tailored for tech companies',
+    tags: ['tech', 'engineering']
+  }
+);
+
+if (versionId) {
+  console.log('Version saved:', versionId);
+}
+```
+
+---
+
+### getVersions
+
+Retrieves a paginated list of version metadata (without full CV data).
+
+```typescript
+async function getVersions(
+  userId: string,
+  pageSize: number = 20,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{
+  versions: CVVersionMetadata[];
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+}>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ParamField path="pageSize" type="number" default="20">
+  Number of versions to retrieve per page
+</ParamField>
+
+<ParamField path="lastDoc" type="QueryDocumentSnapshot" optional>
+  Last document from previous page for pagination
+</ParamField>
+
+<ResponseField name="versions" type="CVVersionMetadata[]">
+  Array of version metadata objects, sorted by creation date (newest first)
+</ResponseField>
+
+<ResponseField name="lastDoc" type="QueryDocumentSnapshot | null">
+  Last document for pagination, null if no more pages
+</ResponseField>
+
+**Example:**
+```typescript
+let lastDoc = null;
+const allVersions = [];
+
+do {
+  const { versions, lastDoc: nextDoc } = await getVersions(userId, 20, lastDoc);
+  allVersions.push(...versions);
+  lastDoc = nextDoc;
+} while (lastDoc);
+
+console.log(`Loaded ${allVersions.length} versions`);
+```
+
+---
+
+### getAllVersions
+
+Retrieves all versions without pagination.
+
+```typescript
+async function getAllVersions(userId: string): Promise<CVVersionMetadata[]>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ResponseField name="return" type="CVVersionMetadata[]">
+  Array of all version metadata objects
+</ResponseField>
+
+---
+
+### getVersion
+
+Retrieves a specific version by ID, including full CV data.
+
+```typescript
+async function getVersion(versionId: string): Promise<CVVersion | null>
+```
+
+<ParamField path="versionId" type="string" required>
+  The unique identifier for the version
+</ParamField>
+
+<ResponseField name="return" type="CVVersion | null">
+  Complete version object with full CV data, or null if not found
+</ResponseField>
+
+**CVVersion Interface:**
+```typescript
+interface CVVersion {
+  id: string;
+  userId: string;
+  data: CVData;
+  versionName: string;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  isAutoSave: boolean;
+}
+```
+
+**Example:**
+```typescript
+const version = await getVersion(versionId);
+
+if (version) {
+  console.log('Version:', version.versionName);
+  console.log('Created:', version.createdAt);
+  console.log('Data:', version.data);
+}
+```
+
+---
+
+### restoreVersion
+
+Restores CV to a specific version, creating an automatic backup first.
+
+```typescript
+async function restoreVersion(userId: string, versionId: string): Promise<boolean>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ParamField path="versionId" type="string" required>
+  The version ID to restore
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if restore succeeded, false otherwise
+</ResponseField>
+
+**Behavior:**
+1. Fetches the version to restore
+2. Creates automatic backup of current CV data
+3. Restores the version data to main CV document
+4. Updates `currentVersionId` field
+
+**Example:**
+```typescript
+const success = await restoreVersion(userId, versionId);
+
+if (success) {
+  console.log('Version restored successfully');
+} else {
+  console.error('Failed to restore version');
+}
+```
+
+**Error Handling:**
+- Returns false if version not found
+- Returns false if backup creation fails
+- Logs errors to console with `[cvService]` prefix
+
+---
+
+### deleteVersion
+
+Deletes a specific version.
+
+```typescript
+async function deleteVersion(versionId: string): Promise<boolean>
+```
+
+<ParamField path="versionId" type="string" required>
+  The version ID to delete
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if deletion succeeded, false otherwise
+</ResponseField>
+
+**Example:**
+```typescript
+const deleted = await deleteVersion(versionId);
+console.log(deleted ? 'Deleted' : 'Failed');
+```
+
+---
+
+### updateVersionMetadata
+
+Updates version metadata (name, description, tags) without changing the CV data.
+
+```typescript
+async function updateVersionMetadata(
+  versionId: string,
+  metadata: Partial<Pick<CVVersionInput, "versionName" | "description" | "tags">>
+): Promise<boolean>
+```
+
+<ParamField path="versionId" type="string" required>
+  The version ID to update
+</ParamField>
+
+<ParamField path="metadata" type="Partial<CVVersionInput>" required>
+  Partial metadata object with fields to update
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if update succeeded, false otherwise
+</ResponseField>
+
+**Example:**
+```typescript
+const updated = await updateVersionMetadata(versionId, {
+  versionName: 'Updated Version Name',
+  tags: ['updated', 'important']
+});
+```
+
+---
+
+### searchVersions
+
+Searches versions by name, description, or tags.
+
+```typescript
+async function searchVersions(
+  userId: string,
+  searchTerm: string
+): Promise<CVVersionMetadata[]>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ParamField path="searchTerm" type="string" required>
+  Search term to match against name, description, or tags
+</ParamField>
+
+<ResponseField name="return" type="CVVersionMetadata[]">
+  Array of matching versions, limited to 200 results
+</ResponseField>
+
+**Behavior:**
+- Case-insensitive search
+- Matches against version name, description, and tags
+- Returns up to 200 results
+- Fetches all versions then filters (Firestore limitation)
+
+**Example:**
+```typescript
+const results = await searchVersions(userId, 'engineer');
+console.log(`Found ${results.length} matching versions`);
+```
+
+---
+
+## Backup Operations
+
+### backupCV
+
+Creates a backup of current CV data before overwriting.
+
+```typescript
+async function backupCV(
+  userId: string,
+  reason: string = "manual_backup"
+): Promise<boolean>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ParamField path="reason" type="string" default="manual_backup">
+  Reason for creating the backup
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if backup succeeded, false otherwise
+</ResponseField>
+
+**Behavior:**
+- Creates backup with timestamp-based ID
+- Automatically cleans up old backups (keeps last 5)
+- Returns false if no CV data exists
+- Sanitizes data before backup
+
+**Example:**
+```typescript
+const backed = await backupCV(userId, 'before_major_changes');
+
+if (backed) {
+  // Safe to proceed with changes
+  await saveCV(userId, newData);
+}
+```
+
+---
+
+## Resume List Operations
+
+### getResumeListItem
+
+Retrieves resume metadata and statistics for display in resume lists.
+
+```typescript
+async function getResumeListItem(userId: string): Promise<ResumeListItem | null>
+```
+
+<ParamField path="userId" type="string" required>
+  The unique identifier for the user
+</ParamField>
+
+<ResponseField name="return" type="ResumeListItem | null">
+  Resume list item with metadata and stats, or null if not found
+</ResponseField>
+
+**ResumeListItem Interface:**
+```typescript
+interface ResumeListItem {
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  currentVersionId?: string;
+  fullName: string;
+  jobTitle: string;
+  versionCount: number;
+  lastVersionDate?: Date;
+  sectionCounts: {
+    experience: number;
+    education: number;
+    projects: number;
+    skills: number;
+    languages: number;
+    achievements: number;
+  };
+}
+```
+
+**Example:**
+```typescript
+const item = await getResumeListItem(userId);
+
+if (item) {
+  console.log(`${item.fullName} - ${item.jobTitle}`);
+  console.log(`${item.versionCount} versions`);
+  console.log(`${item.sectionCounts.experience} experiences`);
+}
+```
+
+---
+
+## Utility Functions
+
+### sanitizeCVDataForFirestore
+
+Internal function that sanitizes CV data for Firestore by replacing undefined values.
+
+```typescript
+function sanitizeCVDataForFirestore(data: CVData): CVData
+```
+
+**Behavior:**
+- Replaces `undefined` template with `"default"`
+- Ensures all fields are Firestore-compatible
+- Used automatically by all save operations
+
+---
+
+## Constants
+
+```typescript
+const MAX_BACKUPS = 5; // Maximum number of backups to keep
+const VERSIONS_PAGE_SIZE = 20; // Default page size for version listing
+```
+
+---
+
+## Error Handling
+
+All service functions include error handling:
+
+- Errors are logged to console with `[cvService]` prefix
+- Functions return `null` or `false` on failure instead of throwing
+- Check return values to handle errors gracefully
+
+**Example:**
+```typescript
+try {
+  const data = await loadCV(userId);
+  
+  if (!data) {
+    // Handle missing or invalid CV
+    console.log('No valid CV data found');
+    return;
+  }
+  
+  // Process data
+} catch (error) {
+  // Handle unexpected errors
+  console.error('Unexpected error:', error);
+}
+```
+
+---
+
+## Related Services
+
+- [Draft Storage](/api/services/draft-storage) - Local draft persistence
+- [Validation](/api/services/validation) - CV data validation
+- [Image Storage](/api/services/image-storage) - Profile image handling

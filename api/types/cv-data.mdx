@@ -1,0 +1,650 @@
+---
+title: 'CV Data Types'
+description: 'TypeScript interfaces for CV content structure and sections'
+---
+
+## Overview
+
+Core TypeScript interfaces for CV Builder data structure, including personal information, experience, education, projects, and section configuration.
+
+## CVData
+
+Main CV data structure containing all sections and configuration.
+
+```typescript
+interface CVData {
+  personalInfo: PersonalInfo;
+  experience: Experience[];
+  education: Education[];
+  projects: Project[];
+  achievements: Achievement[];
+  languages: Language[];
+  skills: Skill[];
+  sectionOrder: SectionId[];
+  references: string;
+  hiddenSections: SectionId[];
+  template?: TemplateId;
+}
+```
+
+### Fields
+
+<ParamField path="personalInfo" type="PersonalInfo" required>
+  Contact information and professional summary.
+</ParamField>
+
+<ParamField path="experience" type="Experience[]" required>
+  Work experience entries. Empty array if none.
+</ParamField>
+
+<ParamField path="education" type="Education[]" required>
+  Education history. Empty array if none.
+</ParamField>
+
+<ParamField path="projects" type="Project[]" required>
+  Project portfolio. Empty array if none.
+</ParamField>
+
+<ParamField path="achievements" type="Achievement[]" required>
+  Awards and achievements. Empty array if none.
+</ParamField>
+
+<ParamField path="languages" type="Language[]" required>
+  Language proficiencies. Empty array if none.
+</ParamField>
+
+<ParamField path="skills" type="Skill[]" required>
+  Technical and professional skills. Empty array if none.
+</ParamField>
+
+<ParamField path="sectionOrder" type="SectionId[]" required>
+  Order of sections in the CV. `'personal'` is always first.
+</ParamField>
+
+<ParamField path="references" type="string" required>
+  References text (e.g., "Available upon request").
+</ParamField>
+
+<ParamField path="hiddenSections" type="SectionId[]" required>
+  Sections hidden from preview and PDF export.
+</ParamField>
+
+<ParamField path="template" type="TemplateId">
+  Selected CV template. Defaults to `'default'`.
+  
+  Options: `'default'` | `'rhyhorn'` | `'nexus'`
+</ParamField>
+
+### Initial Value
+
+```typescript
+const initialCVData: CVData = {
+  personalInfo: {
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
+    jobTitle: "",
+    summary: "",
+    linkedin: "",
+    github: "",
+    website: "",
+    profileImageUrl: "",
+  },
+  experience: [],
+  education: [],
+  projects: [],
+  achievements: [],
+  languages: [],
+  skills: [],
+  sectionOrder: [
+    "personal",
+    "skills",
+    "experience",
+    "education",
+    "projects",
+    "achievements",
+    "languages",
+    "references",
+  ],
+  references: "Available upon request.",
+  hiddenSections: [],
+  template: 'default',
+};
+```
+
+## PersonalInfo
+
+Contact information and professional details.
+
+```typescript
+interface PersonalInfo {
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  jobTitle: string;
+  summary: string;
+  website?: string;
+  linkedin?: string;
+  github?: string;
+  profileImageUrl?: string;
+}
+```
+
+### Fields
+
+<ParamField path="fullName" type="string" required>
+  Full name (e.g., "John Doe").
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  Email address (e.g., "john@example.com").
+</ParamField>
+
+<ParamField path="phone" type="string" required>
+  Phone number (e.g., "+1 234-567-8900").
+</ParamField>
+
+<ParamField path="address" type="string" required>
+  Physical address or location (e.g., "San Francisco, CA").
+</ParamField>
+
+<ParamField path="jobTitle" type="string" required>
+  Current or desired job title (e.g., "Senior Software Engineer").
+</ParamField>
+
+<ParamField path="summary" type="string" required>
+  Professional summary or bio. Can be multi-paragraph.
+</ParamField>
+
+<ParamField path="website" type="string">
+  Personal website URL.
+</ParamField>
+
+<ParamField path="linkedin" type="string">
+  LinkedIn profile URL.
+</ParamField>
+
+<ParamField path="github" type="string">
+  GitHub profile URL.
+</ParamField>
+
+<ParamField path="profileImageUrl" type="string">
+  Profile photo URL (stored in Firebase Storage).
+</ParamField>
+
+## Experience
+
+Work experience entry.
+
+```typescript
+interface Experience {
+  id: string;
+  company: string;
+  role: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  description: string;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier (UUID).
+</ParamField>
+
+<ParamField path="company" type="string" required>
+  Company or organization name.
+</ParamField>
+
+<ParamField path="role" type="string" required>
+  Job title or role.
+</ParamField>
+
+<ParamField path="startDate" type="string" required>
+  Start date in any format (e.g., "Jan 2020", "2020-01").
+</ParamField>
+
+<ParamField path="endDate" type="string" required>
+  End date. Can be "Present" if `current` is `true`.
+</ParamField>
+
+<ParamField path="current" type="boolean" required>
+  `true` if currently employed at this position.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Job responsibilities and achievements. Supports markdown.
+</ParamField>
+
+## Education
+
+Education history entry.
+
+```typescript
+interface Education {
+  id: string;
+  school: string;
+  degree: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier (UUID).
+</ParamField>
+
+<ParamField path="school" type="string" required>
+  School, college, or university name.
+</ParamField>
+
+<ParamField path="degree" type="string" required>
+  Degree or program name (e.g., "B.S. Computer Science").
+</ParamField>
+
+<ParamField path="startDate" type="string" required>
+  Start date (e.g., "2016", "Sep 2016").
+</ParamField>
+
+<ParamField path="endDate" type="string" required>
+  Graduation date (e.g., "2020", "May 2020").
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Additional details (GPA, honors, coursework, etc.).
+</ParamField>
+
+## Project
+
+Project portfolio entry.
+
+```typescript
+interface Project {
+  id: string;
+  title: string;
+  date: string;
+  techStack: string;
+  description: string;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier (UUID).
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Project name.
+</ParamField>
+
+<ParamField path="date" type="string" required>
+  Project date or date range (e.g., "2023", "Jan - Mar 2023").
+</ParamField>
+
+<ParamField path="techStack" type="string" required>
+  Technologies used. Format: "Skill: React, Node.js, PostgreSQL"
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Project details and achievements. Supports markdown.
+</ParamField>
+
+## Achievement
+
+Award or achievement entry.
+
+```typescript
+interface Achievement {
+  id: string;
+  title: string;
+  organization: string;
+  date: string;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier (UUID).
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Award or achievement name.
+</ParamField>
+
+<ParamField path="organization" type="string" required>
+  Issuing organization.
+</ParamField>
+
+<ParamField path="date" type="string" required>
+  Date received (e.g., "2023", "June 2023").
+</ParamField>
+
+## Language
+
+Language proficiency entry.
+
+```typescript
+interface Language {
+  id: string;
+  name: string;
+  proficiency: string;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier (UUID).
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Language name (e.g., "English", "Spanish").
+</ParamField>
+
+<ParamField path="proficiency" type="string" required>
+  Proficiency level (e.g., "Native", "Fluent", "Intermediate", "Basic").
+</ParamField>
+
+## Skill
+
+Skill entry (technical or professional).
+
+```typescript
+interface Skill {
+  id: string;
+  name: string;
+  description?: string;
+  category?: 'technical' | 'professional';
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier (UUID).
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Skill name (e.g., "Programming Languages", "Leadership").
+</ParamField>
+
+<ParamField path="description" type="string">
+  Skill details or comma-separated values (e.g., "C, C++, Java, Python").
+</ParamField>
+
+<ParamField path="category" type="'technical' | 'professional'">
+  Skill category for grouping.
+</ParamField>
+
+## SectionId
+
+CV section identifier.
+
+```typescript
+type SectionId =
+  | "personal"
+  | "experience"
+  | "education"
+  | "projects"
+  | "achievements"
+  | "languages"
+  | "skills"
+  | "references";
+```
+
+### Default Order
+
+```typescript
+const defaultSectionOrder: SectionId[] = [
+  "personal",
+  "skills",
+  "experience",
+  "education",
+  "projects",
+  "achievements",
+  "languages",
+  "references",
+];
+```
+
+## TemplateId
+
+CV template identifier.
+
+```typescript
+type TemplateId = 'default' | 'rhyhorn' | 'nexus';
+```
+
+### Templates
+
+- `'default'` - Standard professional template
+- `'rhyhorn'` - Modern two-column layout
+- `'nexus'` - Minimalist single-column design
+
+## ResumeListItem
+
+Resume metadata for list views.
+
+```typescript
+interface ResumeListItem {
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  currentVersionId?: string;
+  fullName: string;
+  jobTitle: string;
+  versionCount: number;
+  lastVersionDate?: Date;
+  sectionCounts: {
+    experience: number;
+    education: number;
+    projects: number;
+    skills: number;
+    languages: number;
+    achievements: number;
+  };
+}
+```
+
+### Fields
+
+<ParamField path="userId" type="string" required>
+  User ID (Firebase Auth UID).
+</ParamField>
+
+<ParamField path="createdAt" type="Date" required>
+  CV creation timestamp.
+</ParamField>
+
+<ParamField path="updatedAt" type="Date" required>
+  Last update timestamp.
+</ParamField>
+
+<ParamField path="currentVersionId" type="string">
+  ID of the currently active version.
+</ParamField>
+
+<ParamField path="fullName" type="string" required>
+  User's full name from personal info.
+</ParamField>
+
+<ParamField path="jobTitle" type="string" required>
+  User's job title from personal info.
+</ParamField>
+
+<ParamField path="versionCount" type="number" required>
+  Total number of saved versions.
+</ParamField>
+
+<ParamField path="lastVersionDate" type="Date">
+  Timestamp of most recent version.
+</ParamField>
+
+<ParamField path="sectionCounts" type="object" required>
+  Item counts for each section array.
+</ParamField>
+
+## Utility Functions
+
+### normalizeSectionOrder
+
+Normalize and validate section order array.
+
+```typescript
+function normalizeSectionOrder(order?: SectionId[]): SectionId[]
+```
+
+**Behavior:**
+- Removes duplicates
+- Filters invalid section IDs
+- Adds missing sections at the end
+- Ensures `'personal'` is always first
+
+**Example:**
+```typescript
+const order = normalizeSectionOrder(['experience', 'personal', 'education']);
+// Returns: ['personal', 'experience', 'education', 'projects', ...]
+```
+
+### isSectionHidden
+
+Check if a section is hidden.
+
+```typescript
+function isSectionHidden(
+  sectionId: SectionId,
+  hiddenSections?: SectionId[]
+): boolean
+```
+
+**Example:**
+```typescript
+const isHidden = isSectionHidden('references', cvData.hiddenSections);
+if (!isHidden) {
+  // Render section
+}
+```
+
+### getVisibleSections
+
+Get list of visible sections.
+
+```typescript
+function getVisibleSections(
+  sectionOrder: SectionId[],
+  hiddenSections?: SectionId[]
+): SectionId[]
+```
+
+**Example:**
+```typescript
+const visible = getVisibleSections(
+  cvData.sectionOrder,
+  cvData.hiddenSections
+);
+
+visible.forEach(sectionId => {
+  // Render visible sections only
+});
+```
+
+## Usage Examples
+
+### Creating CV Data
+
+```typescript
+import { CVData, initialCVData, PersonalInfo } from '@/lib/types';
+
+const newCV: CVData = {
+  ...initialCVData,
+  personalInfo: {
+    fullName: 'John Doe',
+    email: 'john@example.com',
+    phone: '+1 234-567-8900',
+    address: 'San Francisco, CA',
+    jobTitle: 'Senior Software Engineer',
+    summary: 'Experienced developer with 8+ years...',
+  },
+  experience: [
+    {
+      id: crypto.randomUUID(),
+      company: 'Tech Corp',
+      role: 'Senior Engineer',
+      startDate: 'Jan 2020',
+      endDate: 'Present',
+      current: true,
+      description: 'Led team of 5 developers...'
+    }
+  ],
+  template: 'rhyhorn'
+};
+```
+
+### Form Integration
+
+```typescript
+import { useForm } from 'react-hook-form';
+import { CVData, initialCVData } from '@/lib/types';
+
+const CVForm = () => {
+  const form = useForm<CVData>({
+    defaultValues: initialCVData
+  });
+  
+  const onSubmit = (data: CVData) => {
+    console.log('CV Data:', data);
+  };
+  
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)}>
+      <input {...form.register('personalInfo.fullName')} />
+      <input {...form.register('personalInfo.email')} />
+      {/* ... other fields */}
+    </form>
+  );
+};
+```
+
+### Section Rendering
+
+```typescript
+const CVPreview = ({ data }: { data: CVData }) => {
+  const visibleSections = getVisibleSections(
+    data.sectionOrder,
+    data.hiddenSections
+  );
+  
+  return (
+    <div>
+      {visibleSections.map(sectionId => {
+        switch (sectionId) {
+          case 'personal':
+            return <PersonalInfoSection data={data.personalInfo} />;
+          case 'experience':
+            return <ExperienceSection items={data.experience} />;
+          case 'education':
+            return <EducationSection items={data.education} />;
+          // ... other sections
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+};
+```
+
+## Related
+
+- [useCVDraft Hook](/api/hooks/use-cv-draft) - Manage CV drafts
+- [Version Control Types](/api/types/version-control) - Version management
+- [Merge Result Types](/api/types/merge-result) - Conflict resolution

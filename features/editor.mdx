@@ -1,0 +1,334 @@
+---
+title: "CV Editor"
+description: "Build your resume with a powerful form-based editor featuring real-time preview, auto-save, and section management"
+---
+
+## Overview
+
+The CV Builder editor provides a comprehensive form-based interface for creating professional resumes. The editor features real-time preview, automatic saving, drag-and-drop section reordering, and intelligent validation.
+
+## Architecture
+
+The editor is built using React Hook Form and renders dynamically based on section order:
+
+```typescript
+// components/cv-builder.tsx:964-970
+const methods = useForm<CVData>({
+  defaultValues: {
+    ...initialCVData,
+    template: initialTemplate,
+  },
+  mode: "onChange",
+});
+```
+
+## Key Features
+
+### Form Sections
+
+The editor supports 8 customizable sections:
+
+<CodeGroup>
+```typescript Personal Details
+// components/forms/PersonalDetailsForm.tsx
+interface PersonalInfo {
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  jobTitle: string;
+  summary: string;
+  website?: string;
+  linkedin?: string;
+  github?: string;
+  profileImageUrl?: string;
+}
+```
+
+```typescript Experience
+// lib/types.ts:14-22
+interface Experience {
+  id: string;
+  company: string;
+  role: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  description: string;
+}
+```
+
+```typescript Education
+// lib/types.ts:24-31
+interface Education {
+  id: string;
+  school: string;
+  degree: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+}
+```
+</CodeGroup>
+
+### Real-Time Preview
+
+Changes in the editor are instantly reflected in the live preview panel:
+
+```typescript
+// components/cv-builder.tsx:1040-1043
+function LivePreviewWrapper({ control, template }) {
+  const data = useNormalizedCVData(control);
+  return <CVPreview data={data} template={template} />;
+}
+```
+
+The preview automatically updates as you type, using React Hook Form's `control` object to watch all form changes.
+
+### Auto-Save
+
+The editor includes intelligent auto-save functionality that runs every 5 seconds:
+
+```typescript
+// hooks/useCVDraft.ts:21
+const AUTO_SAVE_INTERVAL = 5000; // 5 seconds
+```
+
+**Auto-save behavior:**
+
+<Steps>
+  <Step title="Local Draft">
+    All changes are automatically saved to localStorage every 5 seconds to prevent data loss
+  </Step>
+  <Step title="Cloud Sync">
+    When authenticated, changes sync to Firebase after local save completes
+  </Step>
+  <Step title="Change Detection">
+    Only saves when data has actually changed (lib/backend/cvDraftStorage.ts:128)
+  </Step>
+</Steps>
+
+<Note>
+Auto-save only triggers when the form contains meaningful content - empty forms are not saved to avoid cluttering storage.
+</Note>
+
+### Section Management
+
+#### Reordering Sections
+
+Users can drag-and-drop sections to customize the order they appear in their CV:
+
+```typescript
+// components/cv-builder.tsx:797-800
+onSectionOrderChange={(order) => {
+  methods.setValue("sectionOrder", order, { shouldDirty: true, shouldTouch: true });
+}}
+```
+
+The section sidebar (components/layout/SectionSidebar.tsx) provides the drag-and-drop interface.
+
+#### Hiding Sections
+
+Users can toggle section visibility to exclude sections from their CV:
+
+```typescript
+// components/cv-builder.tsx:210-217
+const toggleSectionVisibility = useCallback((sectionId: SectionId) => {
+  if (sectionId === "personal") return;
+  const current = methods.getValues("hiddenSections") || [];
+  const updated = current.includes(sectionId)
+    ? current.filter((id) => id !== sectionId)
+    : [...current, sectionId];
+  methods.setValue("hiddenSections", updated, { shouldDirty: true });
+}, [methods]);
+```
+
+<Warning>
+The "personal" section cannot be hidden as it contains essential contact information.
+</Warning>
+
+### Scroll Spy Navigation
+
+The editor includes scroll spy functionality that highlights the active section as you scroll:
+
+```typescript
+// components/cv-builder.tsx:197-202
+const { pauseObserver } = useScrollSpy({
+  sectionOrder,
+  hiddenSections,
+  onSectionChange: setActiveSection,
+  containerId: "editor-scroll-container",
+});
+```
+
+Clicking a section in the sidebar automatically scrolls to that section with a smooth animation:
+
+```typescript
+// components/cv-builder.tsx:247
+container.scrollTo({ top: scrollTo, behavior: "smooth" });
+```
+
+### Form Validation
+
+The editor uses Zod schemas for runtime validation:
+
+```typescript
+// lib/backend/cvValidation.ts
+export function validateCVData(data: unknown): CVData | null {
+  const result = cvDataSchema.safeParse(data);
+  return result.success ? result.data : null;
+}
+```
+
+Validation runs when:
+- Loading saved data from localStorage or cloud
+- Before PDF export
+- Before saving versions
+
+## Responsive Design
+
+### Mobile Tab Toggle
+
+On mobile devices, the editor and preview are shown in tabs:
+
+```tsx
+// components/cv-builder.tsx:758-776
+<div className="md:hidden flex border-b border-slate-200">
+  <Button
+    variant={activeTab === "editor" ? "gradient" : "ghost"}
+    fullWidth
+    onClick={() => setActiveTab("editor")}
+    leftIcon={<PenTool className="w-5 h-5" />}
+  >
+    Editor
+  </Button>
+  <Button
+    variant={activeTab === "preview" ? "gradient" : "ghost"}
+    fullWidth
+    onClick={() => setActiveTab("preview")}
+    leftIcon={<Eye className="w-5 h-5" />}
+  >
+    Preview
+  </Button>
+</div>
+```
+
+### Desktop Split View
+
+On desktop, editor and preview are shown side-by-side with responsive widths:
+
+```tsx
+// components/cv-builder.tsx:782-787
+<motion.div
+  className="w-full md:w-1/2 lg:w-[45%] xl:w-[40%]"
+>
+  {/* Editor */}
+</motion.div>
+<div className="w-full md:w-1/2 lg:w-[55%] xl:w-[60%]">
+  {/* Preview */}
+</div>
+```
+
+## Guest Mode
+
+Users can start editing without authentication. A guest mode banner is displayed:
+
+```tsx
+// components/cv-builder.tsx:838-859
+{!user && (
+  <div className="mt-3 p-3 rounded-lg bg-indigo-50 border border-indigo-200">
+    <div className="flex items-center gap-3">
+      <CloudOff className="w-4 h-4" />
+      <div>
+        <p className="text-sm font-medium">Guest Mode</p>
+        <p className="text-xs">Sign in to save your CV to the cloud</p>
+      </div>
+      <Button onClick={() => setShowAuthModal(true)}>Sign in</Button>
+    </div>
+  </div>
+)}
+```
+
+In guest mode:
+- All data is saved to localStorage only
+- No cloud sync or version control
+- Data persists across browser sessions
+- Can migrate to cloud by signing in
+
+## Clear All
+
+Users can clear all form data and start fresh:
+
+```typescript
+// components/cv-builder.tsx:400-405
+const handleClearAll = () => {
+  setShowClearConfirm(false);
+  methods.reset(initialCVData);
+  clearDraft();
+  toast({ title: "All fields cleared. Starting fresh.", type: "info" });
+};
+```
+
+<Warning>
+Clearing all data also removes the localStorage draft. This action cannot be undone unless you have saved versions.
+</Warning>
+
+## Save Status Indicator
+
+The editor displays the current save status in the header:
+
+```typescript
+// components/cv-builder.tsx:61-66
+const saveButtonConfig = {
+  idle: { icon: Save, text: "Save", className: "" },
+  saving: { icon: Loader2, text: "Saving...", className: "animate-spin" },
+  saved: { icon: Check, text: "Saved", className: "" },
+  error: { icon: CloudOff, text: "Failed", className: "" },
+};
+```
+
+States:
+- **idle**: Ready to save
+- **saving**: Upload in progress
+- **saved**: Successfully synced to cloud
+- **error**: Save failed (data still in localStorage)
+
+## Performance Optimizations
+
+### Debounced Auto-Save
+
+Auto-save is debounced to avoid excessive writes:
+
+```typescript
+// hooks/useCVDraft.ts:136-147
+const saveToDraft = useCallback(() => {
+  const currentData = getValues();
+  
+  // Only save if data has changed from last save
+  if (
+    !lastSavedDataRef.current ||
+    hasDataChanged(lastSavedDataRef.current, currentData)
+  ) {
+    saveDraft(currentData);
+    lastSavedDataRef.current = currentData;
+  }
+}, [getValues]);
+```
+
+### Memoized Computed Values
+
+Expensive computations are memoized:
+
+```typescript
+// components/cv-builder.tsx:101
+const normalizedData = useNormalizedCVData(methods.control);
+```
+
+### Reduced Motion Support
+
+Respects user's motion preferences:
+
+```typescript
+// components/cv-builder.tsx:99
+const reducedMotion = useReducedMotion() ?? false;
+```

@@ -1,0 +1,566 @@
+---
+title: 'Version Control Types'
+description: 'TypeScript interfaces for CV version management and history tracking'
+---
+
+## Overview
+
+TypeScript interfaces for CV version control, including version metadata, full version data, and CV document structure.
+
+## CVVersion
+
+Complete version data including full CV content.
+
+```typescript
+interface CVVersion {
+  id: string;
+  userId: string;
+  data: CVData;
+  versionName: string;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  isAutoSave: boolean;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique version identifier (Firestore document ID).
+</ParamField>
+
+<ParamField path="userId" type="string" required>
+  User ID who owns this version (Firebase Auth UID).
+</ParamField>
+
+<ParamField path="data" type="CVData" required>
+  Complete CV content snapshot at this version.
+  
+  See [CVData](/api/types/cv-data) for structure.
+</ParamField>
+
+<ParamField path="versionName" type="string" required>
+  User-defined version name (e.g., "Senior Developer Resume", "Tech Company Application").
+</ParamField>
+
+<ParamField path="description" type="string">
+  Optional description of changes or purpose (e.g., "Updated for FAANG applications").
+</ParamField>
+
+<ParamField path="tags" type="string[]">
+  Optional tags for organization (e.g., `['tech', 'senior', '2024']`).
+</ParamField>
+
+<ParamField path="createdAt" type="Date" required>
+  Timestamp when version was created.
+</ParamField>
+
+<ParamField path="isAutoSave" type="boolean" required>
+  `true` if version was created automatically, `false` if manually saved by user.
+</ParamField>
+
+### Usage
+
+```typescript
+const version: CVVersion = {
+  id: 'version_abc123',
+  userId: 'user_xyz789',
+  data: cvData,
+  versionName: 'Software Engineer Resume - Google',
+  description: 'Tailored for Google L5 position',
+  tags: ['google', 'senior', 'tech'],
+  createdAt: new Date(),
+  isAutoSave: false
+};
+```
+
+## CVVersionMetadata
+
+Lightweight version metadata without full CV content.
+
+```typescript
+interface CVVersionMetadata {
+  id: string;
+  userId: string;
+  versionName: string;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  isAutoSave: boolean;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique version identifier.
+</ParamField>
+
+<ParamField path="userId" type="string" required>
+  User ID who owns this version.
+</ParamField>
+
+<ParamField path="versionName" type="string" required>
+  User-defined version name.
+</ParamField>
+
+<ParamField path="description" type="string">
+  Optional description.
+</ParamField>
+
+<ParamField path="tags" type="string[]">
+  Optional tags.
+</ParamField>
+
+<ParamField path="createdAt" type="Date" required>
+  Version creation timestamp.
+</ParamField>
+
+<ParamField path="isAutoSave" type="boolean" required>
+  Whether version was auto-saved.
+</ParamField>
+
+### Usage
+
+**Use for list views to reduce data transfer:**
+
+```typescript
+// Efficient: Only loads metadata
+const versions: CVVersionMetadata[] = await getVersions(userId);
+
+// Later, load full data only when needed
+const fullVersion: CVVersion = await getVersion(versionId);
+```
+
+**Typical list rendering:**
+
+```typescript
+const VersionList = ({ versions }: { versions: CVVersionMetadata[] }) => {
+  return (
+    <ul>
+      {versions.map(v => (
+        <li key={v.id}>
+          <h3>{v.versionName}</h3>
+          <p>{v.description}</p>
+          <div>
+            {v.tags?.map(tag => <Badge key={tag}>{tag}</Badge>)}
+          </div>
+          <time>{v.createdAt.toLocaleDateString()}</time>
+          {v.isAutoSave && <Badge variant="secondary">Auto-saved</Badge>}
+        </li>
+      ))}
+    </ul>
+  );
+};
+```
+
+## CVVersionInput
+
+Input data for creating a new version.
+
+```typescript
+interface CVVersionInput {
+  versionName: string;
+  description?: string;
+  tags?: string[];
+}
+```
+
+### Fields
+
+<ParamField path="versionName" type="string" required>
+  Name for the new version.
+  
+  **Validation:**
+  - Must be non-empty
+  - Recommended: 3-100 characters
+  - Should be descriptive
+</ParamField>
+
+<ParamField path="description" type="string">
+  Optional description of changes or purpose.
+  
+  **Recommended for:**
+  - Documenting major changes
+  - Explaining version purpose
+  - Adding context for future reference
+</ParamField>
+
+<ParamField path="tags" type="string[]">
+  Optional tags for categorization.
+  
+  **Best practices:**
+  - Use lowercase
+  - Keep tags short (1-20 chars)
+  - Use common categories (e.g., year, industry, level)
+</ParamField>
+
+### Usage
+
+```typescript
+const input: CVVersionInput = {
+  versionName: 'Senior Backend Engineer - Netflix',
+  description: 'Emphasized distributed systems experience',
+  tags: ['netflix', 'senior', 'backend', '2024']
+};
+
+const versionId = await saveVersion(userId, cvData, input, false);
+```
+
+**Form validation:**
+
+```typescript
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+const versionSchema = z.object({
+  versionName: z.string().min(3).max(100),
+  description: z.string().max(500).optional(),
+  tags: z.array(z.string().max(20)).max(10).optional()
+});
+
+const VersionForm = () => {
+  const form = useForm<CVVersionInput>({
+    resolver: zodResolver(versionSchema)
+  });
+  
+  const onSubmit = async (data: CVVersionInput) => {
+    await saveNewVersion(data);
+  };
+  
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)}>
+      <input {...form.register('versionName')} placeholder="Version name" />
+      <textarea {...form.register('description')} placeholder="Description" />
+      <input {...form.register('tags')} placeholder="Tags (comma-separated)" />
+      <button type="submit">Save Version</button>
+    </form>
+  );
+};
+```
+
+## CVDocument
+
+Main CV document stored in Firestore.
+
+```typescript
+interface CVDocument {
+  data: CVData;
+  updatedAt: Date;
+  createdAt: Date;
+  currentVersionId?: string;
+}
+```
+
+### Fields
+
+<ParamField path="data" type="CVData" required>
+  Current CV content.
+  
+  See [CVData](/api/types/cv-data) for structure.
+</ParamField>
+
+<ParamField path="updatedAt" type="Date" required>
+  Last modification timestamp. Auto-updated on each save.
+</ParamField>
+
+<ParamField path="createdAt" type="Date" required>
+  Document creation timestamp. Set once, never changes.
+</ParamField>
+
+<ParamField path="currentVersionId" type="string">
+  ID of the version that was last restored. `undefined` if never restored.
+  
+  **Use cases:**
+  - Track which version is currently active
+  - Link main CV to version history
+  - Show "Current version" badge in UI
+</ParamField>
+
+### Usage
+
+**Firestore structure:**
+
+```
+users/{userId}/cv
+  ├─ data: CVData
+  ├─ updatedAt: Timestamp
+  ├─ createdAt: Timestamp
+  └─ currentVersionId?: string
+
+users/{userId}/versions/{versionId}
+  ├─ data: CVData
+  ├─ versionName: string
+  ├─ description?: string
+  ├─ tags?: string[]
+  ├─ createdAt: Timestamp
+  └─ isAutoSave: boolean
+```
+
+**Loading CV document:**
+
+```typescript
+const loadCV = async (userId: string): Promise<CVData | null> => {
+  const docRef = doc(db, 'users', userId, 'cv');
+  const snapshot = await getDoc(docRef);
+  
+  if (!snapshot.exists()) return null;
+  
+  const cvDoc = snapshot.data() as CVDocument;
+  return cvDoc.data;
+};
+```
+
+**Saving CV document:**
+
+```typescript
+const saveCV = async (userId: string, data: CVData): Promise<void> => {
+  const docRef = doc(db, 'users', userId, 'cv');
+  
+  await setDoc(docRef, {
+    data,
+    updatedAt: serverTimestamp(),
+    // createdAt is set only on first save via setDoc merge
+  }, { merge: true });
+};
+```
+
+## Usage Examples
+
+### Creating a Version
+
+```typescript
+import { useCVVersions } from '@/hooks/useCVVersions';
+import { CVVersionInput } from '@/lib/types';
+
+const CreateVersionDialog = () => {
+  const { saveNewVersion } = useCVVersions({ userId });
+  const [input, setInput] = useState<CVVersionInput>({
+    versionName: '',
+    description: '',
+    tags: []
+  });
+  
+  const handleSave = async () => {
+    const versionId = await saveNewVersion(input);
+    
+    if (versionId) {
+      toast.success('Version saved!');
+      onClose();
+    } else {
+      toast.error('Failed to save version');
+    }
+  };
+  
+  return (
+    <Dialog>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Save Version</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <Input
+            placeholder="Version name"
+            value={input.versionName}
+            onChange={e => setInput({ ...input, versionName: e.target.value })}
+          />
+          
+          <Textarea
+            placeholder="Description (optional)"
+            value={input.description}
+            onChange={e => setInput({ ...input, description: e.target.value })}
+          />
+          
+          <TagInput
+            tags={input.tags || []}
+            onChange={tags => setInput({ ...input, tags })}
+          />
+        </div>
+        
+        <DialogFooter>
+          <Button onClick={handleSave}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+```
+
+### Version History with Metadata
+
+```typescript
+const VersionHistory = () => {
+  const { user } = useAuth();
+  const { versions, isLoading, getVersionData, restoreToVersion } = useCVVersions({
+    userId: user?.uid ?? null
+  });
+  
+  const [previewVersion, setPreviewVersion] = useState<CVVersion | null>(null);
+  
+  const handlePreview = async (versionId: string) => {
+    const version = await getVersionData(versionId);
+    setPreviewVersion(version);
+  };
+  
+  const handleRestore = async (versionId: string) => {
+    const confirmed = await confirm('Restore this version?');
+    
+    if (confirmed) {
+      const success = await restoreToVersion(versionId);
+      
+      if (success) {
+        toast.success('Version restored');
+        window.location.reload();
+      }
+    }
+  };
+  
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <h2>Versions</h2>
+        {isLoading ? (
+          <SkeletonList count={5} />
+        ) : (
+          <ul className="space-y-2">
+            {versions.map(v => (
+              <li key={v.id} className="border rounded p-4">
+                <h3 className="font-semibold">{v.versionName}</h3>
+                {v.description && (
+                  <p className="text-sm text-muted-foreground">{v.description}</p>
+                )}
+                <div className="flex gap-2 mt-2">
+                  {v.tags?.map(tag => (
+                    <Badge key={tag} variant="secondary">{tag}</Badge>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button size="sm" onClick={() => handlePreview(v.id)}>
+                    Preview
+                  </Button>
+                  <Button size="sm" onClick={() => handleRestore(v.id)}>
+                    Restore
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      
+      <div>
+        {previewVersion ? (
+          <div>
+            <h2>Preview: {previewVersion.versionName}</h2>
+            <CVPreview data={previewVersion.data} />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Select a version to preview</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+```
+
+### Filtering by Tags
+
+```typescript
+const FilteredVersions = () => {
+  const { versions } = useCVVersions({ userId });
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  
+  // Get all unique tags
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    versions.forEach(v => v.tags?.forEach(tag => tags.add(tag)));
+    return Array.from(tags).sort();
+  }, [versions]);
+  
+  // Filter versions by selected tag
+  const filteredVersions = useMemo(() => {
+    if (!selectedTag) return versions;
+    return versions.filter(v => v.tags?.includes(selectedTag));
+  }, [versions, selectedTag]);
+  
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        <Button
+          variant={selectedTag === null ? 'default' : 'outline'}
+          onClick={() => setSelectedTag(null)}
+        >
+          All
+        </Button>
+        {allTags.map(tag => (
+          <Button
+            key={tag}
+            variant={selectedTag === tag ? 'default' : 'outline'}
+            onClick={() => setSelectedTag(tag)}
+          >
+            {tag}
+          </Button>
+        ))}
+      </div>
+      
+      <VersionList versions={filteredVersions} />
+    </div>
+  );
+};
+```
+
+## Best Practices
+
+### Version Naming
+
+```typescript
+// Good names
+'Senior SWE - Google Application'
+'Backend Focus - Netflix'
+'Tech Lead Resume - 2024'
+'Startup Applications'
+
+// Avoid
+'Version 1'
+'Latest'
+'Updated'
+'asdf'
+```
+
+### Use Tags Effectively
+
+```typescript
+const commonTags = {
+  year: ['2024', '2023'],
+  level: ['entry', 'mid', 'senior', 'staff', 'principal'],
+  industry: ['tech', 'finance', 'healthcare', 'startup'],
+  focus: ['frontend', 'backend', 'fullstack', 'mobile', 'devops'],
+  company: ['faang', 'startup', 'enterprise']
+};
+```
+
+### Auto-Save vs Manual
+
+```typescript
+// Manual save: User-initiated
+await saveVersion(userId, cvData, {
+  versionName: 'Google Application',
+  description: 'Ready for submission'
+}, false); // isAutoSave = false
+
+// Auto-save: System-initiated
+await saveVersion(userId, cvData, {
+  versionName: `Auto-save ${new Date().toISOString()}`
+}, true); // isAutoSave = true
+```
+
+## Related
+
+- [useCVVersions Hook](/api/hooks/use-cv-versions) - Version management operations
+- [CVData Types](/api/types/cv-data) - CV content structure
+- [MergeResult Types](/api/types/merge-result) - Conflict resolution

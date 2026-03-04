@@ -1,0 +1,245 @@
+---
+title: Development Setup
+description: Set up your local development environment for CV Builder
+---
+
+This guide will help you set up CV Builder for local development.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js** 18.17 or later
+- **pnpm** (recommended package manager)
+- **Git** for version control
+- **Firebase account** (optional, for cloud features)
+
+### Installing pnpm
+
+If you don't have pnpm installed:
+
+```bash
+npm install -g pnpm
+```
+
+## Installation Steps
+
+### 1. Clone the Repository
+
+First, fork the repository on GitHub, then clone your fork:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/CV-Builder.git
+cd CV-Builder
+```
+
+Add the upstream repository as a remote:
+
+```bash
+git remote add upstream https://github.com/tariqahmaad/CV-Builder.git
+```
+
+### 2. Install Dependencies
+
+Install all project dependencies using pnpm:
+
+```bash
+pnpm install
+```
+
+This will install:
+- Next.js 16.1.6 with App Router
+- React 19.2.3 with React Compiler
+- TypeScript 5
+- Tailwind CSS 4
+- Firebase 12.8.0
+- All other dependencies
+
+### 3. Configure Environment Variables
+
+Create a `.env.local` file in the root directory:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Edit `.env.local` with your configuration:
+
+```bash
+# Firebase Configuration (Optional)
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+# Google Gemini API (Optional - for AI features)
+GOOGLE_GEMINI_API_KEY=your_gemini_api_key
+```
+
+<Note>
+  **Guest Mode**: CV Builder works fully in guest mode with localStorage. Firebase configuration is only needed for cloud sync and authentication features.
+</Note>
+
+### 4. Firebase Setup (Optional)
+
+If you want to test cloud features:
+
+#### Create Firebase Project
+
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project
+3. Register a web app in your project
+
+#### Enable Authentication
+
+1. Navigate to **Authentication** in Firebase Console
+2. Click **Get Started**
+3. Enable **Email/Password** provider
+
+#### Create Firestore Database
+
+1. Navigate to **Firestore Database**
+2. Click **Create Database**
+3. Choose **Production mode**
+4. Select a location
+
+#### Configure Storage
+
+1. Navigate to **Storage**
+2. Click **Get Started**
+3. Use default security rules
+
+#### Copy Configuration
+
+Copy your Firebase web app configuration to `.env.local`.
+
+### 5. Start Development Server
+
+Start the Next.js development server:
+
+```bash
+pnpm dev
+```
+
+The application will be available at [http://localhost:3000](http://localhost:3000).
+
+## Available Scripts
+
+Here are the main npm scripts you'll use during development:
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start development server with hot reload on port 3000 |
+| `pnpm build` | Create optimized production build |
+| `pnpm start` | Start production server (requires build first) |
+| `pnpm lint` | Run ESLint to check code quality |
+
+### Development Workflow
+
+```bash
+# Start development server
+pnpm dev
+
+# In another terminal, run linting while developing
+pnpm lint
+
+# Before committing, ensure build works
+pnpm build
+```
+
+## Project Structure Overview
+
+```
+CV-Builder/
+├── app/                    # Next.js App Router
+│   ├── api/                # API routes
+│   ├── editor/             # CV editor page
+│   ├── resumes/            # Resume management pages
+│   ├── templates/          # Template preview page
+│   ├── layout.tsx          # Root layout
+│   └── page.tsx            # Landing page
+├── components/             # React components
+│   ├── ai/                 # AI chatbot components
+│   ├── forms/              # Form section components
+│   ├── home/               # Landing page sections
+│   ├── layout/             # Layout components
+│   ├── preview/            # Live preview & PDF
+│   ├── resumes/            # Resume management UI
+│   ├── templates/          # Template system
+│   └── ui/                 # Reusable UI primitives
+├── hooks/                  # Custom React hooks
+├── lib/                    # Core utilities
+│   ├── backend/            # Backend services
+│   ├── AuthContext.tsx     # Authentication context
+│   ├── cvService.ts        # CV business logic
+│   ├── firebase.ts         # Firebase configuration
+│   └── types.ts            # TypeScript types
+├── public/                 # Static assets
+├── .env.local              # Environment variables
+├── eslint.config.mjs       # ESLint configuration
+├── next.config.ts          # Next.js configuration
+├── package.json            # Dependencies
+├── tailwind.config.ts      # Tailwind configuration
+└── tsconfig.json           # TypeScript configuration
+```
+
+## Verifying Your Setup
+
+To verify everything is working correctly:
+
+1. **Development Server**: Visit http://localhost:3000 and ensure the landing page loads
+2. **Guest Mode**: Click "Start Building" and verify you can edit a resume
+3. **Linting**: Run `pnpm lint` and ensure no errors
+4. **Build**: Run `pnpm build` and verify it completes successfully
+
+## Troubleshooting
+
+### Port Already in Use
+
+If port 3000 is already in use:
+
+```bash
+PORT=3001 pnpm dev
+```
+
+### Build Errors
+
+Clear the build cache:
+
+```bash
+rm -rf .next
+pnpm build
+```
+
+### Dependency Issues
+
+Reinstall dependencies:
+
+```bash
+rm -rf node_modules pnpm-lock.yaml
+pnpm install
+```
+
+### TypeScript Errors
+
+Restart your TypeScript server in your IDE or run:
+
+```bash
+pnpm build
+```
+
+To check for type errors without creating a build.
+
+## Next Steps
+
+Now that your environment is set up:
+
+1. Read the [Architecture Guide](/contributing/architecture) to understand the codebase
+2. Review the [Code Style Guide](/contributing/code-style) for coding standards
+3. Check out open issues on GitHub to find something to work on
+
+---
+
+If you encounter any issues not covered here, please open an issue on GitHub!

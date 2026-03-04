@@ -1,0 +1,464 @@
+---
+title: 'useResumeList'
+description: 'React hook for fetching resume metadata and recent version history'
+---
+
+## Overview
+
+The `useResumeList` hook fetches resume summary information and recent version history for a user. It provides quick access to CV metadata without loading full CV content.
+
+## Import
+
+```typescript
+import { useResumeList } from '@/hooks/useResumeList';
+```
+
+## Usage
+
+```typescript
+const Dashboard = () => {
+  const { user } = useAuth();
+  
+  const {
+    resume,
+    recentVersions,
+    isLoading,
+    isVersionsLoading,
+    error,
+    refresh
+  } = useResumeList({
+    userId: user?.uid ?? null
+  });
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return <ErrorMessage message={error} />;
+  }
+
+  if (!resume) {
+    return <EmptyState message="No resume found" />;
+  }
+
+  return (
+    <div>
+      <ResumeCard
+        fullName={resume.fullName}
+        jobTitle={resume.jobTitle}
+        lastUpdated={resume.updatedAt}
+        sectionCounts={resume.sectionCounts}
+      />
+      
+      <RecentVersions
+        versions={recentVersions}
+        isLoading={isVersionsLoading}
+      />
+      
+      <RefreshButton onClick={refresh} />
+    </div>
+  );
+};
+```
+
+## Parameters
+
+<ParamField path="userId" type="string | null" required>
+  User ID to fetch resume data for. Pass `null` for unauthenticated users (returns no data).
+</ParamField>
+
+## Return Value
+
+<ResponseField name="resume" type="ResumeListItem | null">
+  Resume metadata and statistics. `null` if user has no CV or is not authenticated.
+  
+  **Structure:**
+  ```typescript
+  interface ResumeListItem {
+    userId: string;
+    createdAt: Date;
+    updatedAt: Date;
+    currentVersionId?: string;
+    fullName: string;
+    jobTitle: string;
+    versionCount: number;
+    lastVersionDate?: Date;
+    sectionCounts: {
+      experience: number;
+      education: number;
+      projects: number;
+      skills: number;
+      languages: number;
+      achievements: number;
+    };
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="recentVersions" type="CVVersionMetadata[]">
+  Array of 5 most recent version metadata objects, sorted by creation date.
+  
+  **Structure:**
+  ```typescript
+  interface CVVersionMetadata {
+    id: string;
+    userId: string;
+    versionName: string;
+    description?: string;
+    tags?: string[];
+    createdAt: Date;
+    isAutoSave: boolean;
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean">
+  `true` while loading resume metadata. Use for skeleton loading states.
+</ResponseField>
+
+<ResponseField name="isVersionsLoading" type="boolean">
+  `true` while loading recent versions. Separate from `isLoading` to allow independent loading states.
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if data fetching fails. `null` when no error.
+</ResponseField>
+
+<ResponseField name="refresh" type="() => Promise<void>">
+  Manually refresh resume data and recent versions.
+  
+  **Use cases:**
+  - Pull-to-refresh
+  - After editing CV
+  - After creating/deleting versions
+</ResponseField>
+
+## Features
+
+### Automatic Data Loading
+
+Loads data automatically when `userId` is provided:
+
+```typescript
+const { resume, recentVersions } = useResumeList({ userId });
+// Data loads automatically on mount and when userId changes
+```
+
+### Section Statistics
+
+Provides counts for each CV section:
+
+```typescript
+const StatsSummary = ({ resume }: { resume: ResumeListItem }) => {
+  const { sectionCounts } = resume;
+  
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <StatCard label="Experience" count={sectionCounts.experience} />
+      <StatCard label="Education" count={sectionCounts.education} />
+      <StatCard label="Projects" count={sectionCounts.projects} />
+      <StatCard label="Skills" count={sectionCounts.skills} />
+      <StatCard label="Languages" count={sectionCounts.languages} />
+      <StatCard label="Achievements" count={sectionCounts.achievements} />
+    </div>
+  );
+};
+```
+
+### Recent Versions (Top 5)
+
+Fetches 5 most recent versions:
+
+```typescript
+const RECENT_VERSIONS_COUNT = 5;
+```
+
+Use for quick access to version history:
+
+```typescript
+const QuickVersions = ({ versions }: { versions: CVVersionMetadata[] }) => {
+  return (
+    <div>
+      <h3>Recent Versions</h3>
+      {versions.length === 0 ? (
+        <p>No versions yet</p>
+      ) : (
+        <ul>
+          {versions.map(v => (
+            <li key={v.id}>
+              {v.versionName} - {v.createdAt.toLocaleDateString()}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+```
+
+## Advanced Examples
+
+### Dashboard with Stats
+
+```typescript
+const CVDashboard = () => {
+  const { user } = useAuth();
+  const { resume, recentVersions, isLoading, error } = useResumeList({
+    userId: user?.uid ?? null
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!resume) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p>No resume found. Create your first CV!</p>
+          <Button onClick={() => router.push('/builder')}>Get Started</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalSections = Object.values(resume.sectionCounts).reduce(
+    (sum, count) => sum + count,
+    0
+  );
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{resume.fullName || 'Untitled Resume'}</CardTitle>
+          <CardDescription>{resume.jobTitle || 'No job title'}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Last updated: {resume.updatedAt.toLocaleDateString()}</span>
+            <span>{totalSections} sections</span>
+            <span>{resume.versionCount} versions</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Section Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {Object.entries(resume.sectionCounts).map(([section, count]) => (
+              <div key={section} className="flex flex-col">
+                <span className="text-2xl font-bold">{count}</span>
+                <span className="text-sm text-muted-foreground capitalize">
+                  {section}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Versions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentVersions.length === 0 ? (
+            <p className="text-muted-foreground">No versions saved yet</p>
+          ) : (
+            <ul className="space-y-2">
+              {recentVersions.map(version => (
+                <li key={version.id} className="flex justify-between">
+                  <span>{version.versionName}</span>
+                  <span className="text-muted-foreground">
+                    {version.createdAt.toLocaleDateString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+```
+
+### Progress Indicator
+
+```typescript
+const CVCompletionBadge = ({ resume }: { resume: ResumeListItem }) => {
+  const totalSections = Object.values(resume.sectionCounts).reduce(
+    (sum, count) => sum + count,
+    0
+  );
+  
+  const hasBasicInfo = resume.fullName && resume.jobTitle;
+  const completionScore = hasBasicInfo ? totalSections + 2 : totalSections;
+  const maxScore = 20; // Arbitrary max for "complete" resume
+  
+  const percentage = Math.min((completionScore / maxScore) * 100, 100);
+  
+  let status: 'empty' | 'started' | 'good' | 'excellent';
+  if (percentage === 0) status = 'empty';
+  else if (percentage < 30) status = 'started';
+  else if (percentage < 70) status = 'good';
+  else status = 'excellent';
+  
+  const colors = {
+    empty: 'bg-gray-200',
+    started: 'bg-yellow-200',
+    good: 'bg-blue-200',
+    excellent: 'bg-green-200'
+  };
+  
+  return (
+    <div>
+      <div className="flex justify-between mb-1">
+        <span className="text-sm font-medium">Profile Completion</span>
+        <span className="text-sm font-medium">{Math.round(percentage)}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2.5">
+        <div
+          className={`h-2.5 rounded-full ${colors[status]}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+```
+
+### Refresh After Updates
+
+```typescript
+const CVEditor = () => {
+  const { refresh } = useResumeList({ userId });
+  const { saveToCloud } = useCVDraft({ user, isAuthLoading });
+  
+  const handleSave = async () => {
+    const success = await saveToCloud();
+    
+    if (success) {
+      // Refresh resume list to show updated stats
+      await refresh();
+      toast.success('CV saved and stats updated');
+    }
+  };
+  
+  return (
+    <div>
+      <CVForm />
+      <Button onClick={handleSave}>Save</Button>
+    </div>
+  );
+};
+```
+
+### Version Count Badge
+
+```typescript
+const VersionBadge = ({ resume }: { resume: ResumeListItem }) => {
+  const hasVersions = resume.versionCount > 0;
+  
+  return (
+    <Badge variant={hasVersions ? 'default' : 'secondary'}>
+      {resume.versionCount} {resume.versionCount === 1 ? 'version' : 'versions'}
+      {resume.lastVersionDate && (
+        <span className="ml-1 text-xs">
+          (last: {resume.lastVersionDate.toLocaleDateString()})
+        </span>
+      )}
+    </Badge>
+  );
+};
+```
+
+## Best Practices
+
+### Handle Empty States
+
+```typescript
+if (!resume) {
+  return (
+    <EmptyState
+      title="No resume yet"
+      description="Create your first CV to get started"
+      action={<Button onClick={() => router.push('/builder')}>Create CV</Button>}
+    />
+  );
+}
+```
+
+### Show Loading States
+
+```typescript
+return (
+  <div>
+    {isLoading ? (
+      <Skeleton className="h-32" />
+    ) : (
+      <ResumeCard resume={resume} />
+    )}
+    
+    {isVersionsLoading ? (
+      <div className="space-y-2">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    ) : (
+      <VersionList versions={recentVersions} />
+    )}
+  </div>
+);
+```
+
+### Handle Errors Gracefully
+
+```typescript
+if (error) {
+  return (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>Error</AlertTitle>
+      <AlertDescription>
+        {error}
+        <Button variant="outline" onClick={refresh} className="ml-2">
+          Retry
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+```
+
+## Performance
+
+- Fetches only metadata, not full CV content (lightweight)
+- Loads resume and versions in parallel
+- Auto-loads on mount and when `userId` changes
+- No pagination needed (only 5 recent versions)
+
+## Related
+
+- [useCVVersions](/api/hooks/use-cv-versions) - Full version management
+- [useCVDraft](/api/hooks/use-cv-draft) - Draft and save operations
+- [ResumeListItem Type](/api/types/cv-data) - Resume metadata structure

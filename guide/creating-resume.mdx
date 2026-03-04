@@ -1,0 +1,256 @@
+---
+title: Creating Your Resume
+description: Step-by-step guide to building a professional resume with CV Builder
+---
+
+CV Builder provides an intuitive interface for creating a professional resume. This guide walks you through the entire process from start to finish.
+
+## Getting Started
+
+Once you're logged in, you'll see the CV Builder dashboard with:
+- **Section Sidebar** on the left with all resume sections
+- **Editor Panel** in the center for entering your information
+- **Live Preview** on the right showing your formatted resume
+
+<Screenshot src="/images/dashboard.png" alt="CV Builder Dashboard" />
+
+## Resume Creation Workflow
+
+<Steps>
+  <Step title="Start with Personal Details">
+    The Personal Details section is always first. Fill in your basic information:
+    - Full Name (required)
+    - Job Title (required)
+    - Email address
+    - Phone number
+    - Location/Address
+    - Professional summary
+    - Social links (LinkedIn, GitHub, Portfolio)
+    - Profile photo (optional)
+    
+    <Tip>
+    Your full name and job title appear prominently at the top of your resume, so make sure they're accurate and professional.
+    </Tip>
+  </Step>
+  
+  <Step title="Add Work Experience">
+    Click on the "Experience" section in the sidebar:
+    - Click "Add Experience" to create a new entry
+    - Fill in company name, role, dates, and description
+    - Mark "Currently working here" if it's your current job
+    - Add multiple positions using the "+" button
+    - Reorder entries by dragging them
+    
+    <Note>
+    Use action verbs and quantify your achievements. Example: "Increased sales by 30%" instead of "Responsible for sales."
+    </Note>
+  </Step>
+  
+  <Step title="Add Education">
+    Navigate to the "Education" section:
+    - Add your degree, school name, and dates
+    - Include relevant coursework or honors in the description
+    - Add multiple degrees if applicable
+    - Most recent education should be listed first
+  </Step>
+  
+  <Step title="Add Skills">
+    The "Skills" section showcases your technical and professional abilities:
+    - Add individual skills with names and descriptions
+    - Categorize as "Technical" or "Professional"
+    - Example: "Programming Languages: Python, Java, JavaScript"
+    
+    <Tip>
+    Group related skills together. Instead of listing "Python", "Java", "C++" separately, use one skill: "Languages: Python, Java, C++"
+    </Tip>
+  </Step>
+  
+  <Step title="Add Projects (Optional)">
+    Showcase your personal or professional projects:
+    - Project title and date
+    - Technology stack used
+    - Brief description of the project and your role
+    - Link to GitHub or live demo if available
+  </Step>
+  
+  <Step title="Add Additional Sections">
+    Enhance your resume with optional sections:
+    
+    **Achievements:**
+    - Awards, certifications, publications
+    - Title, organization, and date
+    
+    **Languages:**
+    - Language name and proficiency level
+    - Example: "English - Native", "Spanish - Fluent"
+    
+    **References:**
+    - Add reference information or use "Available upon request"
+  </Step>
+  
+  <Step title="Choose a Template">
+    Select a professional template that matches your industry:
+    - **Default** - Clean, traditional design
+    - **Rhyhorn** - Modern, minimalist style
+    - **Nexus** - Creative, contemporary layout
+    
+    Click the template selector to preview and switch between designs.
+  </Step>
+  
+  <Step title="Preview and Refine">
+    Use the live preview to see your resume in real-time:
+    - Check formatting and spacing
+    - Verify all information is correct
+    - Ensure content fits on appropriate pages
+    - Adjust section order if needed
+  </Step>
+  
+  <Step title="Download or Save">
+    Once you're satisfied:
+    - Click "Download PDF" to export your resume
+    - Your work is automatically saved to the cloud
+    - Create a version snapshot for safekeeping
+  </Step>
+</Steps>
+
+## Understanding the CV Data Structure
+
+Your resume is stored using the `CVData` interface:
+
+```typescript
+interface CVData {
+  personalInfo: PersonalInfo;
+  experience: Experience[];
+  education: Education[];
+  projects: Project[];
+  achievements: Achievement[];
+  languages: Language[];
+  skills: Skill[];
+  sectionOrder: SectionId[];
+  references: string;
+  hiddenSections: SectionId[];
+  template?: TemplateId;
+}
+```
+
+### Section Types
+
+Each section has a specific data structure:
+
+**Experience:**
+```typescript
+interface Experience {
+  id: string;
+  company: string;
+  role: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  description: string;
+}
+```
+
+**Education:**
+```typescript
+interface Education {
+  id: string;
+  school: string;
+  degree: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+}
+```
+
+**Project:**
+```typescript
+interface Project {
+  id: string;
+  title: string;
+  date: string;
+  techStack: string; // e.g., "React, TypeScript, Node.js"
+  description: string;
+}
+```
+
+**Skill:**
+```typescript
+interface Skill {
+  id: string;
+  name: string;
+  description?: string;
+  category?: 'technical' | 'professional';
+}
+```
+
+## Tips for a Great Resume
+
+<Tip>
+**Content Best Practices:**
+- Keep it concise (1-2 pages for most professionals)
+- Use bullet points for easy scanning
+- Quantify achievements with numbers and percentages
+- Tailor your resume for each job application
+- Proofread carefully for spelling and grammar
+- Use consistent formatting throughout
+- Start bullet points with action verbs
+- Focus on recent and relevant experience
+</Tip>
+
+## Section Progress Tracking
+
+The sidebar shows your completion progress:
+- **Green indicator** - Section has content
+- **Gray indicator** - Section is empty
+- **Progress bar** - Overall completion percentage
+
+Fill in all relevant sections to reach 100% completion.
+
+<Screenshot src="/images/progress-tracker.png" alt="Section Progress Tracker" />
+
+## Auto-Save
+
+<Note>
+**Your work is automatically saved:**
+- Changes are saved as you type (when signed in)
+- Local draft is maintained in your browser
+- No need to manually click "Save"
+- Version history tracks major milestones
+</Note>
+
+## Creating Multiple Resumes
+
+You can maintain different versions of your resume:
+- Use version history to save snapshots
+- Tailor each version for specific industries
+- Tag versions by job type or company
+- Restore previous versions anytime
+
+See [Managing Versions](/guide/managing-versions) for details.
+
+## Common Issues
+
+**Content not showing in preview?**
+- Refresh the preview panel
+- Check that the section isn't hidden
+- Verify form fields are filled correctly
+
+**Can't add more entries?**
+- Scroll down in the form panel
+- Click "Add [Section]" button to create new entries
+
+**Preview looks different than PDF?**
+- PDF rendering may vary slightly
+- Download a test PDF to verify final output
+- Adjust content if spacing issues occur
+
+<Warning>
+While guest mode lets you create a resume, your data isn't saved to the cloud. Create an account to ensure your work is preserved.
+</Warning>
+
+## Next Steps
+
+Now that you've created your resume:
+- [Manage section order and visibility](/guide/managing-sections)
+- [Add a profile photo](/guide/profile-images)
+- [Save version snapshots](/guide/managing-versions)

@@ -1,0 +1,200 @@
+---
+title: Authentication
+description: Learn how to sign up, sign in, reset passwords, and verify your email in CV Builder
+---
+
+CV Builder uses Firebase Authentication to secure your resume data. You can create an account with email and password, or continue as a guest to try out the application.
+
+## Creating an Account
+
+To create a new account and save your resume data:
+
+<Steps>
+  <Step title="Navigate to Sign Up">
+    Click the "Sign Up" button on the landing page or login screen.
+  </Step>
+  
+  <Step title="Enter Your Details">
+    Provide your email address and create a strong password:
+    - Password must be at least 8 characters
+    - Confirm your password by entering it again
+    - Email will be normalized (trimmed and lowercased)
+  </Step>
+  
+  <Step title="Email Verification">
+    After signing up, you'll receive a verification email:
+    - Check your inbox for the verification link
+    - Click the link to verify your email address
+    - You can resend the verification email if needed
+  </Step>
+  
+  <Step title="Access Your Resume">
+    Once verified, you can access the CV Builder dashboard and start creating your resume.
+  </Step>
+</Steps>
+
+<Note>
+Email verification is required for new accounts. Your account is created immediately, but you'll need to verify your email to access all features.
+</Note>
+
+## Signing In
+
+If you already have an account:
+
+<Steps>
+  <Step title="Go to Login Page">
+    Click "Sign In" on the landing page.
+  </Step>
+  
+  <Step title="Enter Credentials">
+    Provide your registered email and password.
+  </Step>
+  
+  <Step title="Access Dashboard">
+    You'll be redirected to your CV Builder dashboard where you can edit your resume.
+  </Step>
+</Steps>
+
+### Authentication Flow
+
+The authentication system is powered by Firebase and managed through the `AuthContext`:
+
+```tsx
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  isEmailVerified: boolean;
+  pendingVerification: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, confirmPassword: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  sendVerificationEmail: () => Promise<{ success: boolean; error?: string }>;
+}
+```
+
+## Password Reset
+
+If you forget your password:
+
+<Steps>
+  <Step title="Click 'Forgot Password'">
+    On the login page, click the "Forgot Password?" link.
+  </Step>
+  
+  <Step title="Enter Your Email">
+    Provide the email address associated with your account.
+  </Step>
+  
+  <Step title="Check Your Email">
+    You'll receive a password reset email from Firebase.
+  </Step>
+  
+  <Step title="Reset Your Password">
+    Click the link in the email and follow the instructions to set a new password.
+  </Step>
+</Steps>
+
+<Warning>
+Password reset links expire after a certain period. If your link has expired, request a new one.
+</Warning>
+
+## Email Verification
+
+### Why Email Verification?
+
+Email verification ensures:
+- Account security and ownership
+- Ability to recover your account
+- Prevention of spam and fake accounts
+
+### Verification Process
+
+The verification system tracks state in both Firebase Auth and Firestore:
+
+```typescript
+// User document structure
+{
+  email: string;
+  emailVerified: boolean;
+  verificationRequired: boolean;
+  isChatbotEnabled: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+### Resending Verification Email
+
+If you didn't receive the verification email:
+
+1. Navigate to your account settings
+2. Click "Resend Verification Email"
+3. Check your inbox (and spam folder)
+4. Click the verification link
+
+<Tip>
+The verification email is sent automatically when you create an account. If you don't see it, check your spam folder before requesting a new one.
+</Tip>
+
+## Guest Mode
+
+Want to try CV Builder without creating an account?
+
+<Steps>
+  <Step title="Select Guest Mode">
+    Click "Continue as Guest" on the login page.
+  </Step>
+  
+  <Step title="Build Your Resume">
+    You can use all features to create and preview your resume.
+  </Step>
+  
+  <Step title="Download Your CV">
+    Export your resume as PDF before leaving.
+  </Step>
+</Steps>
+
+<Warning>
+**Guest Mode Limitations:**
+- Your resume data is stored locally in your browser
+- Data is not synced across devices
+- Data may be lost if you clear browser storage
+- Version history is not available
+- Create an account to save your work permanently
+</Warning>
+
+## Signing Out
+
+To sign out of your account:
+
+1. Click your profile icon in the top-right corner
+2. Select "Sign Out" from the dropdown menu
+3. You'll be redirected to the landing page
+
+<Note>
+Your resume data is automatically saved to the cloud when you're signed in. All changes are preserved even after signing out.
+</Note>
+
+## Error Handling
+
+Common authentication errors and solutions:
+
+| Error | Solution |
+|-------|----------|
+| **Invalid email** | Check that your email is properly formatted |
+| **Wrong password** | Use the password reset feature to recover access |
+| **Email already in use** | This email is registered—try signing in instead |
+| **Too many requests** | Wait a few minutes before trying again |
+| **Network error** | Check your internet connection |
+
+## Security Best Practices
+
+<Tip>
+**Keep Your Account Secure:**
+- Use a strong, unique password
+- Verify your email address
+- Don't share your credentials
+- Sign out when using shared devices
+- Keep your email account secure (it's used for password recovery)
+</Tip>

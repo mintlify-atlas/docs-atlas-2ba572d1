@@ -1,0 +1,319 @@
+---
+title: Managing Sections
+description: Learn how to reorder, show, and hide sections in your CV Builder resume
+---
+
+CV Builder gives you complete control over which sections appear in your resume and in what order. This allows you to customize your resume for different job applications.
+
+## Section Order
+
+By default, sections appear in this order:
+
+1. Personal Details (always first)
+2. Skills
+3. Experience
+4. Education
+5. Projects
+6. Achievements
+7. Languages
+8. References
+
+You can customize this order to highlight your strengths for specific roles.
+
+### Reordering Sections
+
+<Steps>
+  <Step title="Open the Section Sidebar">
+    The section sidebar is visible on the left side of the CV Builder dashboard.
+  </Step>
+  
+  <Step title="Drag to Reorder">
+    - Hover over a section item
+    - Click and hold the grip icon (⋮⋮) on the left
+    - Drag the section up or down
+    - Release to place it in the new position
+    
+    <Screenshot src="/images/drag-section.png" alt="Dragging a section to reorder" />
+  </Step>
+  
+  <Step title="See Changes in Preview">
+    The live preview updates immediately to reflect the new section order.
+  </Step>
+</Steps>
+
+<Note>
+The "Personal Details" section is always locked at the top. It cannot be reordered since contact information must appear first on a resume.
+</Note>
+
+### Reset to Default Order
+
+If you want to restore the original section order:
+
+1. Look for the reset icon (↻) in the section sidebar header
+2. Click it to restore the default order
+3. All sections return to their original positions
+
+<Tip>
+The reset button only appears when you've modified the section order.
+</Tip>
+
+## Section Order Implementation
+
+The section order is stored in the `sectionOrder` property of your CV data:
+
+```typescript
+type SectionId =
+  | "personal"
+  | "experience"
+  | "education"
+  | "projects"
+  | "achievements"
+  | "languages"
+  | "skills"
+  | "references";
+
+interface CVData {
+  // ... other properties
+  sectionOrder: SectionId[];
+  // ... other properties
+}
+```
+
+### Default Order
+
+```typescript
+const defaultSectionOrder: SectionId[] = [
+  "personal",
+  "skills",
+  "experience",
+  "education",
+  "projects",
+  "achievements",
+  "languages",
+  "references",
+];
+```
+
+### Normalizing Section Order
+
+CV Builder ensures the section order is always valid:
+
+```typescript
+function normalizeSectionOrder(order?: SectionId[]): SectionId[] {
+  if (!order || order.length === 0) {
+    return [...defaultSectionOrder];
+  }
+
+  const allowed = new Set(defaultSectionOrder);
+  const seen = new Set<SectionId>();
+  const filtered = order.filter((id) => {
+    if (!allowed.has(id) || seen.has(id)) {
+      return false;
+    }
+    seen.add(id);
+    return true;
+  });
+  const missing = defaultSectionOrder.filter((id) => !filtered.includes(id));
+
+  // Ensure 'personal' is always first
+  const withoutPersonal = [...filtered, ...missing].filter((id) => id !== "personal");
+  return ["personal", ...withoutPersonal];
+}
+```
+
+## Hiding Sections
+
+You can hide sections that aren't relevant for a particular job application. Hidden sections:
+- Don't appear in the PDF export
+- Don't show in the live preview
+- Are still saved in your data (can be unhidden later)
+- Don't count toward completion progress
+
+### How to Hide a Section
+
+<Steps>
+  <Step title="Locate the Section">
+    Find the section you want to hide in the sidebar.
+  </Step>
+  
+  <Step title="Click the Eye Icon">
+    - Each section (except Personal Details) has an eye icon on the right
+    - Click the eye icon to toggle visibility
+    - Eye icon: Section is visible
+    - Eye-off icon: Section is hidden
+    
+    <Screenshot src="/images/hide-section.png" alt="Hiding a section" />
+  </Step>
+  
+  <Step title="Verify in Preview">
+    The hidden section disappears from the preview immediately.
+  </Step>
+</Steps>
+
+<Warning>
+Hiding a section doesn't delete its content. Your data is preserved and will reappear when you unhide the section.
+</Warning>
+
+### Show Hidden Sections
+
+To make a hidden section visible again:
+
+1. Find the section with the eye-off icon in the sidebar
+2. Click the eye-off icon to show the section
+3. The section reappears in the preview
+
+### Show All Sections
+
+If you've hidden multiple sections and want to show them all:
+
+1. Click the eye icon in the sidebar header
+2. All hidden sections become visible
+3. This button only appears when sections are hidden
+
+## Hidden Sections Implementation
+
+Hidden sections are tracked in the `hiddenSections` array:
+
+```typescript
+interface CVData {
+  // ... other properties
+  hiddenSections: SectionId[];
+  // ... other properties
+}
+```
+
+### Checking if a Section is Hidden
+
+```typescript
+function isSectionHidden(sectionId: SectionId, hiddenSections?: SectionId[]): boolean {
+  if (!hiddenSections || hiddenSections.length === 0) {
+    return false;
+  }
+  return hiddenSections.includes(sectionId);
+}
+```
+
+### Getting Visible Sections
+
+```typescript
+function getVisibleSections(sectionOrder: SectionId[], hiddenSections?: SectionId[]): SectionId[] {
+  if (!hiddenSections || hiddenSections.length === 0) {
+    return sectionOrder;
+  }
+  return sectionOrder.filter(id => !hiddenSections.includes(id));
+}
+```
+
+## Section Visibility in the Sidebar
+
+The section sidebar component handles reordering and visibility:
+
+```tsx
+interface SectionSidebarProps {
+  activeSection?: SectionId;
+  data?: CVData;
+  onSectionClick?: (sectionId: SectionId) => void;
+  sectionOrder?: SectionId[];
+  onSectionOrderChange?: (order: SectionId[]) => void;
+  hiddenSections?: SectionId[];
+  onToggleHide?: (sectionId: SectionId) => void;
+  onResetHiddenSections?: () => void;
+}
+```
+
+Key features:
+- **Drag and drop** using Framer Motion's `Reorder` components
+- **Visual indicators** show hidden sections with strikethrough and reduced opacity
+- **Eye toggle** for each section (except Personal Details which is locked)
+- **Progress tracking** only counts visible sections
+
+## Use Cases for Section Management
+
+### Tailoring for Different Industries
+
+**Software Engineering Role:**
+- Show: Skills, Experience, Projects, Education
+- Hide: Achievements, Languages, References
+- Order: Skills first to highlight technical abilities
+
+**Academic Position:**
+- Show: Education, Experience, Achievements, References
+- Hide: Projects, Skills
+- Order: Education first, followed by publications
+
+**Creative Role:**
+- Show: Projects, Skills, Experience
+- Hide: Achievements, Languages
+- Order: Projects first to showcase portfolio
+
+<Tip>
+Create different saved versions for different job types. Each version can have its own section order and visibility settings.
+</Tip>
+
+### Entry-Level Resume
+
+If you're early in your career:
+- Hide: Experience (if limited)
+- Show: Education, Projects, Skills, Achievements
+- Order: Education first, then Projects
+
+### Senior Professional Resume
+
+For experienced professionals:
+- Show: Experience, Skills, Achievements
+- Hide: Projects (unless particularly relevant)
+- Order: Experience first, Skills second
+
+## Progress Tracking
+
+The completion progress bar reflects only visible sections:
+
+```typescript
+const visibleSections = getVisibleSections(sectionOrder, hiddenSections);
+const completedSectionsCount = visibleSections.filter(s => hasSectionContent(s, data)).length;
+const progress = Math.round((completedSectionsCount / visibleSections.length) * 100);
+```
+
+Hidden sections:
+- Don't count as "incomplete" sections
+- Don't affect your overall completion percentage
+- Don't show in the progress indicator at the top of the sidebar
+
+<Note>
+The progress bar shows completion for sections that will appear on your final resume. This helps you focus on filling out relevant sections.
+</Note>
+
+## Best Practices
+
+<Tip>
+**Section Management Tips:**
+- Keep 4-6 sections visible for a clean, focused resume
+- Put your strongest section (Skills or Experience) near the top
+- Hide sections with minimal content rather than leaving them empty
+- Use section order to tell your career story effectively
+- Save different versions for different types of jobs
+- Personal Details should always be visible (it's locked for this reason)
+</Tip>
+
+<Warning>
+**Common Mistakes:**
+- Don't hide sections that have important content for the role
+- Don't reorder sections in a confusing way (e.g., References before Experience)
+- Don't forget that hidden sections still exist in your data
+</Warning>
+
+## Keyboard Accessibility
+
+Section management is fully keyboard accessible:
+
+- **Tab** - Navigate between sections
+- **Enter/Space** - Select a section or toggle visibility
+- **Arrow Up/Down** - Move between sections
+- **Home/End** - Jump to first/last section
+- **Escape** - Close sidebar (if collapsible)
+
+## Next Steps
+
+- [Create version snapshots](/guide/managing-versions) of different section configurations
+- [Add a profile image](/guide/profile-images) to enhance your Personal Details section
+- [Learn about authentication](/guide/authentication) to save your customizations

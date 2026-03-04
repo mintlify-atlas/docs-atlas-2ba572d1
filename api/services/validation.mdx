@@ -1,0 +1,599 @@
+---
+title: "Validation"
+description: "CV data validation and schema definitions using Zod"
+---
+
+The Validation service provides Zod schemas and validation functions for CV data structures, ensuring type safety and data integrity.
+
+## Overview
+
+The service provides:
+- Zod schemas for all CV data types
+- Validation with automatic defaults
+- Data sanitization and normalization
+- Type inference from schemas
+- CV emptiness validation
+
+**Source:** `lib/backend/cvValidation.ts:168`
+
+---
+
+## Core Schemas
+
+### PersonalInfoSchema
+
+Schema for personal information section.
+
+```typescript
+const PersonalInfoSchema = z.object({
+  fullName: z.string().default(""),
+  email: z.string().default(""),
+  phone: z.string().default(""),
+  address: z.string().default(""),
+  jobTitle: z.string().default(""),
+  summary: z.string().default(""),
+  website: z.string().optional().default(""),
+  linkedin: z.string().optional().default(""),
+  github: z.string().optional().default(""),
+  profileImageUrl: z.string().optional().default(""),
+});
+```
+
+**Fields:**
+- All string fields default to empty string
+- Optional fields: website, linkedin, github, profileImageUrl
+
+---
+
+### ExperienceSchema
+
+Schema for work experience entries.
+
+```typescript
+const ExperienceSchema = z.object({
+  id: z.string(),
+  company: z.string().default(""),
+  role: z.string().default(""),
+  startDate: z.string().default(""),
+  endDate: z.string().default(""),
+  current: z.boolean().default(false),
+  description: z.string().default(""),
+});
+```
+
+**Fields:**
+- `id`: Required string identifier
+- `company`: Company name
+- `role`: Job title/role
+- `startDate`, `endDate`: Date strings (format flexible)
+- `current`: Whether currently employed
+- `description`: Job description/responsibilities
+
+---
+
+### EducationSchema
+
+Schema for education entries.
+
+```typescript
+const EducationSchema = z.object({
+  id: z.string(),
+  school: z.string().default(""),
+  degree: z.string().default(""),
+  startDate: z.string().default(""),
+  endDate: z.string().default(""),
+  description: z.string().default(""),
+});
+```
+
+---
+
+### ProjectSchema
+
+Schema for project entries.
+
+```typescript
+const ProjectSchema = z.object({
+  id: z.string(),
+  title: z.string().default(""),
+  date: z.string().default(""),
+  techStack: z.string().default(""),
+  description: z.string().default(""),
+});
+```
+
+**Fields:**
+- `techStack`: Technologies used (e.g., "React, TypeScript, Node.js")
+
+---
+
+### AchievementSchema
+
+Schema for achievement/award entries.
+
+```typescript
+const AchievementSchema = z.object({
+  id: z.string(),
+  title: z.string().default(""),
+  organization: z.string().default(""),
+  date: z.string().default(""),
+});
+```
+
+---
+
+### LanguageSchema
+
+Schema for language proficiency entries.
+
+```typescript
+const LanguageSchema = z.object({
+  id: z.string(),
+  name: z.string().default(""),
+  proficiency: z.string().default(""),
+});
+```
+
+**Fields:**
+- `proficiency`: e.g., "Native", "Fluent", "Intermediate"
+
+---
+
+### SkillSchema
+
+Schema for skill entries.
+
+```typescript
+const SkillSchema = z.object({
+  id: z.string(),
+  name: z.string().default(""),
+  description: z.string().optional().default(""),
+  category: z.enum(["technical", "professional"]).optional(),
+});
+```
+
+**Fields:**
+- `name`: Skill name
+- `description`: Optional skill details
+- `category`: "technical" or "professional"
+
+---
+
+### TemplateIdSchema
+
+Schema for CV template selection.
+
+```typescript
+const TemplateIdSchema = z.enum(['default', 'rhyhorn', 'nexus']);
+```
+
+**Available Templates:**
+- `default`: Default template
+- `rhyhorn`: Rhyhorn template
+- `nexus`: Nexus template
+
+---
+
+### CVDataSchema
+
+Complete CV data schema combining all sections.
+
+```typescript
+const CVDataSchema = z.object({
+  personalInfo: PersonalInfoSchema.default({ /* defaults */ }),
+  experience: z.array(ExperienceSchema).default([]),
+  education: z.array(EducationSchema).default([]),
+  projects: z.array(ProjectSchema).default([]),
+  achievements: z.array(AchievementSchema).default([]),
+  languages: z.array(LanguageSchema).default([]),
+  skills: z.array(SkillSchema).default([]),
+  sectionOrder: z.array(z.enum([/* sections */])).default([...defaultSectionOrder]),
+  references: z.string().default("Available upon request."),
+  hiddenSections: z.array(z.enum([/* sections */])).default([]),
+  template: TemplateIdSchema.optional(),
+});
+```
+
+**Special Behaviors:**
+- `sectionOrder`: Normalizes with `normalizeSectionOrder()`
+- `hiddenSections`: Removes duplicates and filters out 'personal'
+- All arrays default to empty
+- Personal info defaults to all empty strings
+
+---
+
+## Validation Functions
+
+### validateCVData
+
+Validates and sanitizes CV data from external sources.
+
+```typescript
+function validateCVData(data: unknown): ValidatedCVData | null
+```
+
+<ParamField path="data" type="unknown" required>
+  The data to validate (typically from Firestore or localStorage)
+</ParamField>
+
+<ResponseField name="return" type="ValidatedCVData | null">
+  Returns validated data with defaults filled in, or null if validation fails
+</ResponseField>
+
+**Behavior:**
+- Uses `CVDataSchema.safeParse()` for safe validation
+- Returns null on validation failure (doesn't throw)
+- Logs validation errors to console
+- Applies defaults for missing fields
+- Normalizes sectionOrder and hiddenSections
+
+**Example:**
+```typescript
+import { validateCVData } from '@/lib/backend/cvValidation';
+
+// From Firestore
+const firestoreData = docSnap.data();
+const validated = validateCVData(firestoreData);
+
+if (validated) {
+  console.log('Valid CV data:', validated);
+} else {
+  console.error('Invalid CV data structure');
+}
+
+// From localStorage
+const stored = localStorage.getItem('cv-draft');
+if (stored) {
+  const parsed = JSON.parse(stored);
+  const validated = validateCVData(parsed.data);
+  
+  if (!validated) {
+    // Clear invalid draft
+    localStorage.removeItem('cv-draft');
+  }
+}
+```
+
+**Validation Errors:**
+```typescript
+const invalidData = {
+  personalInfo: {
+    fullName: 123, // Wrong type
+  },
+  experience: "not an array", // Wrong type
+};
+
+const result = validateCVData(invalidData);
+// Returns null and logs:
+// "CV data validation failed: [validation error details]"
+```
+
+---
+
+### parseAndValidateCVData
+
+Validates CV data and throws an error if invalid.
+
+```typescript
+function parseAndValidateCVData(data: unknown): ValidatedCVData
+```
+
+<ParamField path="data" type="unknown" required>
+  The data to validate
+</ParamField>
+
+<ResponseField name="return" type="ValidatedCVData">
+  Returns validated data with defaults filled in
+</ResponseField>
+
+**Behavior:**
+- Uses `CVDataSchema.parse()` which throws on failure
+- Useful when validation failure should halt execution
+- Throws Zod validation error with details
+
+**Example:**
+```typescript
+import { parseAndValidateCVData } from '@/lib/backend/cvValidation';
+
+try {
+  const validated = parseAndValidateCVData(untrustedData);
+  console.log('Valid data:', validated);
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    console.error('Validation errors:', error.errors);
+    error.errors.forEach(err => {
+      console.log(`${err.path.join('.')}: ${err.message}`);
+    });
+  }
+}
+```
+
+**When to Use:**
+- `validateCVData()`: When you want to handle failure gracefully (returns null)
+- `parseAndValidateCVData()`: When validation failure should throw an error
+
+---
+
+## Type Inference
+
+### ValidatedCVData
+
+TypeScript type inferred from CVDataSchema.
+
+```typescript
+type ValidatedCVData = z.infer<typeof CVDataSchema>;
+```
+
+**Usage:**
+```typescript
+import { ValidatedCVData } from '@/lib/backend/cvValidation';
+
+function processCVData(data: ValidatedCVData) {
+  // data is fully typed with defaults
+  console.log(data.personalInfo.fullName); // string
+  console.log(data.experience); // Experience[]
+  console.log(data.template); // 'default' | 'rhyhorn' | 'nexus' | undefined
+}
+```
+
+---
+
+## CV Emptiness Validation
+
+The service also exports CV emptiness validation from a separate module:
+
+```typescript
+import {
+  validateCVEmptiness,
+  isDownloadable,
+  getEmptyCVMessage,
+  type CVEmptinessResult,
+} from '@/lib/backend/cvValidation';
+```
+
+**Note:** These are re-exported from `./cvEmptinessValidator` (implementation not shown).
+
+---
+
+## Schema Default Values
+
+### Personal Info Defaults
+```typescript
+{
+  fullName: "",
+  email: "",
+  phone: "",
+  address: "",
+  jobTitle: "",
+  summary: "",
+  website: "",
+  linkedin: "",
+  github: "",
+  profileImageUrl: "",
+}
+```
+
+### Section Order Default
+```typescript
+[
+  "personal",
+  "skills",
+  "experience",
+  "education",
+  "projects",
+  "achievements",
+  "languages",
+  "references",
+]
+```
+
+### Other Defaults
+- All arrays: `[]`
+- References: `"Available upon request."`
+- Hidden sections: `[]`
+- Template: `undefined` (not set)
+
+---
+
+## Normalization
+
+### Section Order Normalization
+
+The `sectionOrder` field is automatically normalized:
+
+```typescript
+.transform((order) => normalizeSectionOrder(order))
+```
+
+**Normalization Rules:**
+- Removes duplicates
+- Filters out invalid section IDs
+- Adds missing sections to end
+- Ensures "personal" is always first
+- Returns default order if empty
+
+### Hidden Sections Normalization
+
+The `hiddenSections` field is automatically normalized:
+
+```typescript
+.transform((sections) => {
+  const unique = [...new Set(sections)];
+  return unique.filter((id) => id !== "personal");
+})
+```
+
+**Normalization Rules:**
+- Removes duplicates
+- Filters out "personal" (always visible)
+- Returns empty array if none
+
+---
+
+## Usage Examples
+
+### Loading from Firestore
+
+```typescript
+import { validateCVData } from '@/lib/backend/cvValidation';
+import { fetchCVDocSnapshot } from '@/lib/backend/cvRepository';
+
+const docSnap = await fetchCVDocSnapshot(userId);
+
+if (docSnap.exists()) {
+  const rawData = docSnap.data();
+  const validated = validateCVData(rawData.data);
+  
+  if (validated) {
+    // Use validated data
+    setCV(validated);
+  } else {
+    // Handle invalid data
+    console.error('Invalid CV data in Firestore');
+    setCV(initialCVData);
+  }
+}
+```
+
+### Loading from localStorage
+
+```typescript
+import { validateCVData } from '@/lib/backend/cvValidation';
+
+function loadDraft(): CVData | null {
+  const stored = localStorage.getItem('cv-draft');
+  if (!stored) return null;
+  
+  const parsed = JSON.parse(stored);
+  const validated = validateCVData(parsed.data);
+  
+  if (!validated) {
+    // Clear invalid draft
+    localStorage.removeItem('cv-draft');
+    return null;
+  }
+  
+  return validated;
+}
+```
+
+### Creating New CV
+
+```typescript
+import { validateCVData } from '@/lib/backend/cvValidation';
+import { initialCVData } from '@/lib/types';
+
+// Validate initial data structure
+const validated = validateCVData(initialCVData);
+
+if (validated) {
+  // Safe to use
+  setCV(validated);
+}
+```
+
+### Partial Updates
+
+```typescript
+import { validateCVData } from '@/lib/backend/cvValidation';
+
+// Update personal info
+const updatedData = {
+  ...currentCV,
+  personalInfo: {
+    ...currentCV.personalInfo,
+    fullName: 'John Doe',
+    email: 'john@example.com',
+  }
+};
+
+// Validate updated data
+const validated = validateCVData(updatedData);
+
+if (validated) {
+  await saveCV(userId, validated);
+}
+```
+
+---
+
+## Best Practices
+
+1. **Always validate external data:**
+   ```typescript
+   // Good
+   const data = validateCVData(untrustedData);
+   if (data) { /* use data */ }
+   
+   // Bad
+   const data = untrustedData as CVData; // No validation!
+   ```
+
+2. **Use safeParse for user input:**
+   ```typescript
+   const result = CVDataSchema.safeParse(userInput);
+   if (result.success) {
+     processCV(result.data);
+   } else {
+     showErrors(result.error.errors);
+   }
+   ```
+
+3. **Trust validated data:**
+   ```typescript
+   function processCV(data: ValidatedCVData) {
+     // No need for null checks on required fields
+     console.log(data.personalInfo.fullName); // Always a string
+     console.log(data.experience); // Always an array
+   }
+   ```
+
+4. **Clear invalid data:**
+   ```typescript
+   const validated = validateCVData(storedData);
+   if (!validated) {
+     // Clear corrupted data
+     localStorage.removeItem('cv-draft');
+   }
+   ```
+
+---
+
+## Error Handling
+
+### Validation Errors
+
+```typescript
+import { z } from 'zod';
+
+try {
+  const data = parseAndValidateCVData(input);
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    console.error('Validation failed:');
+    error.errors.forEach(err => {
+      console.error(`  ${err.path.join('.')}: ${err.message}`);
+    });
+  }
+}
+```
+
+### Graceful Degradation
+
+```typescript
+function loadCVSafely(userId: string): CVData {
+  const raw = loadFromStorage(userId);
+  const validated = validateCVData(raw);
+  
+  // Return validated data or initial data as fallback
+  return validated || initialCVData;
+}
+```
+
+---
+
+## Related Services
+
+- [CV Service](/api/services/cv-service) - Uses validation for all data operations
+- [Draft Storage](/api/services/draft-storage) - Uses validation for draft loading
+- [Image Storage](/api/services/image-storage) - Image-specific validation

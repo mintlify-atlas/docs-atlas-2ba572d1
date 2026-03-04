@@ -1,0 +1,145 @@
+---
+title: Contributing Overview
+description: Learn how to contribute to CV Builder and make it even better
+---
+
+We're thrilled that you're interested in contributing to CV Builder! This guide will help you get started with contributing to the project.
+
+## How to Contribute
+
+There are many ways to contribute to CV Builder:
+
+- **Report bugs**: Found a bug? Open an issue on GitHub with detailed reproduction steps
+- **Suggest features**: Have an idea for a new feature? Create a feature request issue
+- **Improve documentation**: Help us make our docs clearer and more comprehensive
+- **Submit code**: Fix bugs, implement features, or improve performance
+- **Review pull requests**: Help review and test contributions from other developers
+
+## Areas for Contribution
+
+Here are some areas where contributions are especially welcome:
+
+### Core Features
+
+- **Resume Templates**: Design and implement new professional resume templates
+- **PDF Export**: Enhance PDF generation quality and formatting options
+- **Form Validation**: Improve validation logic and error messages
+- **Auto-Save**: Optimize draft persistence and conflict resolution
+
+### User Experience
+
+- **Accessibility**: Improve keyboard navigation and screen reader support
+- **Mobile Responsiveness**: Enhance the mobile editing experience
+- **Dark Mode**: Refine dark mode styling and contrast ratios
+- **Animations**: Add subtle micro-interactions for better UX
+
+### Performance
+
+- **Code Splitting**: Optimize bundle size with better code splitting
+- **Image Optimization**: Improve profile image handling and compression
+- **Caching**: Implement smarter caching strategies
+
+### Documentation
+
+- **Tutorials**: Write guides for common use cases
+- **API Documentation**: Document internal APIs and hooks
+- **Architecture Guides**: Explain design decisions and patterns
+
+## Pull Request Process
+
+### 1. Fork and Clone
+
+Start by forking the repository and cloning it locally:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/CV-Builder.git
+cd CV-Builder
+```
+
+### 2. Create a Feature Branch
+
+Create a new branch for your changes:
+
+```bash
+git checkout -b feature/amazing-feature
+```
+
+Use descriptive branch names:
+- `feature/` for new features
+- `fix/` for bug fixes
+- `docs/` for documentation
+- `refactor/` for code improvements
+
+### 3. Make Your Changes
+
+Make your changes following the existing code style and conventions. See the [Code Style](/contributing/code-style) guide for details.
+
+### 4. Test Your Changes
+
+Ensure your changes work as expected:
+
+```bash
+pnpm dev        # Test in development mode
+pnpm build      # Verify production build
+pnpm lint       # Run linting
+```
+
+### 5. Commit Your Changes
+
+Use conventional commit messages:
+
+```bash
+git commit -m 'feat: add amazing feature'
+```
+
+Commit message format:
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, etc.)
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks
+
+### 6. Push and Create PR
+
+Push your changes and open a pull request:
+
+```bash
+git push origin feature/amazing-feature
+```
+
+In your pull request:
+- Provide a clear description of the changes
+- Reference any related issues
+- Include screenshots for UI changes
+- List any breaking changes
+
+## Code Review Process
+
+Once you submit a pull request:
+
+1. **Automated Checks**: GitHub Actions will run linting and build checks
+2. **Code Review**: Maintainers will review your code and provide feedback
+3. **Revisions**: Make any requested changes and push updates
+4. **Approval**: Once approved, a maintainer will merge your PR
+
+## Getting Help
+
+If you need help or have questions:
+
+- **Issues**: Check existing issues or open a new one
+- **Discussions**: Join GitHub Discussions for general questions
+- **Documentation**: Read through our comprehensive docs
+
+## Code of Conduct
+
+Please be respectful and constructive in all interactions. We're building an inclusive community where everyone feels welcome to contribute.
+
+## Recognition
+
+All contributors are recognized in our project! Your contributions help make CV Builder better for everyone.
+
+---
+
+Ready to start contributing? Head over to the [Setup Guide](/contributing/setup) to get your development environment ready.

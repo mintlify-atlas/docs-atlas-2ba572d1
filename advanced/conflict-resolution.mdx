@@ -1,0 +1,636 @@
+---
+title: 'Conflict Resolution'
+description: 'Three-way merge algorithm for handling concurrent edits'
+icon: 'code-merge'
+---
+
+## Overview
+
+CV Builder uses a **three-way merge algorithm** to intelligently resolve conflicts when the same resume is edited on multiple devices. The algorithm compares three versions:
+
+1. **Local** - Changes made in the current browser session
+2. **Server** - Changes made on other devices (synced to Firebase)
+3. **Base** - Common ancestor (last synced state)
+
+All merge logic is implemented in `lib/backend/cvThreeWayMerge.ts`.
+
+## Three-Way Merge Concept
+
+### Why Three-Way Merge?
+
+A simple two-way merge (comparing only local and server) cannot distinguish between:
+- "User A deleted this field" vs "User A never had this field"
+- "User B modified this" vs "This was already that way"
+
+By comparing against a **base version** (the common ancestor), we can determine:
+- What changed locally since last sync
+- What changed on the server since last sync
+- Whether both sides made conflicting changes
+
+### Example Scenario
+
+```typescript
+// Base (last synced state)
+const base = {
+  personalInfo: { fullName: "John Doe" }
+};
+
+// Local (current browser)
+const local = {
+  personalInfo: { fullName: "John Smith" } // Changed locally
+};
+
+// Server (from other device)
+const server = {
+  personalInfo: { fullName: "John Doe" } // Unchanged
+};
+
+// Result: Local change wins (server unchanged)
+// Merged: { fullName: "John Smith" }
+```
+
+## Main Merge Function
+
+```typescript lib/backend/cvThreeWayMerge.ts
+export function threeWayMerge(
+  local: CVData,
+  server: CVData,
+  base: CVData | undefined
+): MergeResult {
+  // If no base, we can't do three-way merge
+  if (!base) {
+    const hasDifferences = !deepEqual(local, server);
+    return {
+      merged: server,
+      conflicts: hasDifferences ? [{
+        section: "sectionOrder",
+        localValue: null,
+        serverValue: null,
+        baseValue: null,
+        description: "No sync history available - cannot detect individual conflicts. Server version will be used.",
+      }] : [],
+      hasConflicts: hasDifferences,
+    };
+  }
+
+  const allConflicts: FieldConflict[] = [];
+
+  // Merge each section...
+  const { merged: personalInfo, conflicts: personalConflicts } = mergePersonalInfo(
+    local.personalInfo,
+    server.personalInfo,
+    base.personalInfo
+  );
+  allConflicts.push(...personalConflicts);
+
+  // Merge arrays...
+  const { merged: experience, conflicts: expConflicts } = mergeArrayById(
+    local.experience,
+    server.experience,
+    base.experience,
+    "experience"
+  );
+  allConflicts.push(...expConflicts);
+
+  // ... (similar for other sections)
+
+  return {
+    merged: /* combined result */,
+    conflicts: allConflicts,
+    hasConflicts: allConflicts.length > 0,
+  };
+}
+```
+
+**Returns:**
+
+<ResponseField name="merged" type="CVData" required>
+  Merged resume data with conflicts resolved to default (usually server)
+</ResponseField>
+
+<ResponseField name="conflicts" type="FieldConflict[]" required>
+  Array of detected conflicts for user review
+</ResponseField>
+
+<ResponseField name="hasConflicts" type="boolean" required>
+  Whether any conflicts were detected
+</ResponseField>
+
+## Conflict Detection Rules
+
+For each field, the algorithm checks:
+
+```typescript
+const localChanged = !deepEqual(localValue, baseValue);
+const serverChanged = !deepEqual(serverValue, baseValue);
+
+if (localChanged && serverChanged && !deepEqual(localValue, serverValue)) {
+  // CONFLICT: Both changed to different values
+  conflicts.push({ ... });
+} else if (localChanged) {
+  // Only local changed - use local value
+  merged.field = localValue;
+} else {
+  // Only server changed or neither changed - use server value
+  merged.field = serverValue;
+}
+```
+
+### Change Detection Outcomes
+
+| Local vs Base | Server vs Base | Local vs Server | Result |
+|---------------|----------------|-----------------|--------|
+| Same | Same | Same | No conflict - use either |
+| Changed | Same | Different | No conflict - use local |
+| Same | Changed | Different | No conflict - use server |
+| Changed | Changed | Same | No conflict - use either |
+| Changed | Changed | Different | **CONFLICT** |
+
+## Merging Personal Info
+
+Personal info is merged field-by-field:
+
+```typescript lib/backend/cvThreeWayMerge.ts
+function mergePersonalInfo(
+  local: PersonalInfo,
+  server: PersonalInfo,
+  base: PersonalInfo
+): { merged: PersonalInfo; conflicts: FieldConflict[] } {
+  const conflicts: FieldConflict[] = [];
+  const merged: PersonalInfo = { ...server };
+
+  const fields: (keyof PersonalInfo)[] = [
+    "fullName",
+    "email",
+    "phone",
+    "address",
+    "jobTitle",
+    "summary",
+    "website",
+    "linkedin",
+    "github",
+    "profileImageUrl",
+  ];
+
+  for (const field of fields) {
+    const localVal = local[field];
+    const serverVal = server[field];
+    const baseVal = base[field];
+
+    const localChanged = hasChanged(localVal, baseVal);
+    const serverChanged = hasChanged(serverVal, baseVal);
+
+    if (localChanged && serverChanged && !deepEqual(localVal, serverVal)) {
+      // Conflict: both changed to different values
+      conflicts.push({
+        section: "personal",
+        field,
+        localValue: localVal,
+        serverValue: serverVal,
+        baseValue: baseVal,
+        description: getFieldDisplayName("personal", field),
+      });
+      // Default: prefer server (safer - already in cloud)
+    } else if (localChanged) {
+      // Only local changed
+      merged[field] = localVal;
+    }
+    // else: only server changed or neither changed, keep server value
+  }
+
+  return { merged, conflicts };
+}
+```
+
+**Example conflict:**
+
+```typescript
+// Base
+base.personalInfo.email = "old@example.com"
+
+// Local changed
+local.personalInfo.email = "new@example.com"
+
+// Server also changed
+server.personalInfo.email = "different@example.com"
+
+// Result: Conflict detected
+conflict = {
+  section: "personal",
+  field: "email",
+  localValue: "new@example.com",
+  serverValue: "different@example.com",
+  baseValue: "old@example.com",
+  description: "Personal Info: Email"
+}
+```
+
+## Merging Arrays
+
+Arrays (experience, education, projects, etc.) are merged by ID:
+
+```typescript lib/backend/cvThreeWayMerge.ts
+function mergeArrayById<T extends { id: string }>(
+  local: T[],
+  server: T[],
+  base: T[],
+  sectionName: SectionId
+): { merged: T[]; conflicts: FieldConflict[] } {
+  const conflicts: FieldConflict[] = [];
+  const result = new Map<string, T>();
+
+  // Create maps for quick lookup
+  const localMap = new Map(local.map((item) => [item.id, item]));
+  const serverMap = new Map(server.map((item) => [item.id, item]));
+  const baseMap = new Map(base.map((item) => [item.id, item]));
+
+  // All IDs across all three versions
+  const allIds = new Set([...localMap.keys(), ...serverMap.keys(), ...baseMap.keys()]);
+
+  for (const id of allIds) {
+    const localItem = localMap.get(id);
+    const serverItem = serverMap.get(id);
+    const baseItem = baseMap.get(id);
+
+    // Handle different cases...
+  }
+
+  // Preserve order from server, append new local items at end
+  const orderedResult: T[] = [];
+  for (const item of server) {
+    if (result.has(item.id)) {
+      orderedResult.push(result.get(item.id)!);
+      result.delete(item.id);
+    }
+  }
+  // Add remaining items (new from local)
+  for (const item of result.values()) {
+    orderedResult.push(item);
+  }
+
+  return { merged: orderedResult, conflicts };
+}
+```
+
+### Array Merge Cases
+
+#### Case 1: New Item Added Locally
+
+```typescript
+// Base: []
+// Local: [{ id: "1", ... }]  <- New item
+// Server: []
+// Result: Include new local item
+```
+
+#### Case 2: New Item Added on Server
+
+```typescript
+// Base: []
+// Local: []
+// Server: [{ id: "1", ... }]  <- New item
+// Result: Include new server item
+```
+
+#### Case 3: Item Deleted Locally
+
+```typescript
+// Base: [{ id: "1", company: "A" }]
+// Local: []  <- Deleted
+// Server: [{ id: "1", company: "A" }]  <- Unchanged
+// Result: Keep deleted (local intent)
+
+// BUT if server modified:
+// Server: [{ id: "1", company: "B" }]  <- Modified
+// Result: CONFLICT (local deleted, server modified)
+```
+
+#### Case 4: Item Deleted on Server
+
+```typescript
+// Base: [{ id: "1", company: "A" }]
+// Local: [{ id: "1", company: "A" }]  <- Unchanged
+// Server: []  <- Deleted
+// Result: Keep deleted (server intent)
+
+// BUT if local modified:
+// Local: [{ id: "1", company: "B" }]  <- Modified
+// Result: CONFLICT (server deleted, local modified)
+```
+
+#### Case 5: Item Modified on Both Sides
+
+```typescript
+// Base: [{ id: "1", company: "A", role: "X" }]
+// Local: [{ id: "1", company: "B", role: "X" }]  <- company changed
+// Server: [{ id: "1", company: "C", role: "X" }]  <- company changed differently
+// Result: CONFLICT (both modified same item)
+```
+
+## Conflict Types
+
+### Field Conflict Structure
+
+```typescript lib/types.ts
+export interface FieldConflict {
+  section: SectionId | 'sectionOrder' | 'hiddenSections' | 'template' | 'references';
+  field?: string;  // For nested fields or item IDs
+  localValue: unknown;
+  serverValue: unknown;
+  baseValue: unknown;
+  description?: string;
+}
+```
+
+### Conflict Examples
+
+**Personal info field conflict:**
+
+```typescript
+{
+  section: "personal",
+  field: "email",
+  localValue: "new@example.com",
+  serverValue: "different@example.com",
+  baseValue: "old@example.com",
+  description: "Personal Info: Email"
+}
+```
+
+**Array item modified on both sides:**
+
+```typescript
+{
+  section: "experience",
+  field: "exp_123",  // Item ID
+  localValue: { id: "exp_123", company: "Local Corp", ... },
+  serverValue: { id: "exp_123", company: "Server Inc", ... },
+  baseValue: { id: "exp_123", company: "Old Company", ... },
+  description: "Experience item"
+}
+```
+
+**Array item deletion conflict:**
+
+```typescript
+{
+  section: "education",
+  field: "edu_456",
+  localValue: null,  // Deleted locally
+  serverValue: { id: "edu_456", school: "University", ... },  // Modified on server
+  baseValue: { id: "edu_456", school: "College", ... },
+  description: "Education item"
+}
+```
+
+## Applying Conflict Resolutions
+
+After user reviews conflicts and makes decisions:
+
+```typescript lib/backend/cvThreeWayMerge.ts
+export function applyResolutions(
+  merged: CVData,
+  conflicts: FieldConflict[],
+  resolutions: Record<string, "local" | "server">
+): CVData {
+  const result = { ...merged };
+
+  for (const conflict of conflicts) {
+    const key = conflict.field ? `${conflict.section}.${conflict.field}` : conflict.section;
+    const resolution = resolutions[key];
+
+    if (resolution === "local") {
+      // Personal info field
+      if (conflict.section === "personal" && conflict.field) {
+        result.personalInfo[conflict.field] = conflict.localValue;
+      }
+      // Array item operations
+      else if (isArraySection(conflict.section) && conflict.field) {
+        const arr = result[conflict.section];
+        const idx = arr.findIndex((item) => item.id === conflict.field);
+        if (idx !== -1) {
+          if (conflict.localValue === null) {
+            // Local deleted the item
+            arr.splice(idx, 1);
+          } else {
+            // Local modified the item
+            arr[idx] = conflict.localValue;
+          }
+        }
+      }
+      // Simple fields
+      else if (conflict.section === "references") {
+        result.references = conflict.localValue;
+      }
+      // ... other cases
+    }
+    // resolution === "server" - already in merged by default
+  }
+
+  return result;
+}
+```
+
+**Usage:**
+
+```typescript
+import { threeWayMerge, applyResolutions } from '@/lib/backend/cvThreeWayMerge';
+
+// 1. Perform merge
+const mergeResult = threeWayMerge(localData, serverData, baseData);
+
+if (mergeResult.hasConflicts) {
+  // 2. Show conflict UI to user
+  const resolutions = await showConflictDialog(mergeResult.conflicts);
+  
+  // 3. Apply user's choices
+  const finalData = applyResolutions(
+    mergeResult.merged,
+    mergeResult.conflicts,
+    resolutions
+  );
+  
+  // 4. Save final data
+  await saveToFirebase(finalData);
+} else {
+  // No conflicts - save merged data
+  await saveToFirebase(mergeResult.merged);
+}
+```
+
+## Complete Sync Flow
+
+```typescript
+import { loadDraft, loadBase, updateBaseAfterSync, clearDraft } from '@/lib/backend/cvDraftStorage';
+import { threeWayMerge, applyResolutions } from '@/lib/backend/cvThreeWayMerge';
+
+async function syncToCloud() {
+  // 1. Load local data
+  const draft = loadDraft();
+  if (!draft) {
+    console.log('No draft to sync');
+    return;
+  }
+  const localData = draft.data;
+
+  // 2. Load base (last synced state)
+  const base = loadBase();
+  const baseData = base?.data;
+
+  // 3. Load server data
+  const serverDoc = await getDoc(doc(db, 'resumes', userId));
+  const serverData = serverDoc.exists() ? serverDoc.data().data : null;
+
+  if (!serverData) {
+    // No server data - first sync
+    await setDoc(doc(db, 'resumes', userId), {
+      data: localData,
+      updatedAt: new Date(),
+      createdAt: new Date(),
+    });
+    updateBaseAfterSync(localData);
+    clearDraft();
+    return;
+  }
+
+  // 4. Perform three-way merge
+  const mergeResult = threeWayMerge(localData, serverData, baseData);
+
+  // 5. Handle conflicts
+  let finalData = mergeResult.merged;
+  
+  if (mergeResult.hasConflicts) {
+    // Show conflict resolution UI
+    const resolutions = await showConflictDialog(mergeResult.conflicts);
+    finalData = applyResolutions(mergeResult.merged, mergeResult.conflicts, resolutions);
+  }
+
+  // 6. Save merged data to server
+  await setDoc(doc(db, 'resumes', userId), {
+    data: finalData,
+    updatedAt: new Date(),
+  });
+
+  // 7. Update base and clear draft
+  updateBaseAfterSync(finalData);
+  clearDraft();
+}
+```
+
+## Conflict Resolution UI
+
+Example UI component for resolving conflicts:
+
+```typescript
+interface ConflictDialogProps {
+  conflicts: FieldConflict[];
+  onResolve: (resolutions: Record<string, "local" | "server">) => void;
+}
+
+function ConflictDialog({ conflicts, onResolve }: ConflictDialogProps) {
+  const [resolutions, setResolutions] = useState<Record<string, "local" | "server">>({});
+
+  const handleResolve = (conflict: FieldConflict, choice: "local" | "server") => {
+    const key = conflict.field ? `${conflict.section}.${conflict.field}` : conflict.section;
+    setResolutions(prev => ({ ...prev, [key]: choice }));
+  };
+
+  return (
+    <Dialog>
+      <DialogTitle>Resolve Conflicts</DialogTitle>
+      <DialogContent>
+        {conflicts.map((conflict, index) => (
+          <ConflictItem
+            key={index}
+            conflict={conflict}
+            onResolve={(choice) => handleResolve(conflict, choice)}
+          />
+        ))}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => onResolve(resolutions)}>
+          Apply Resolutions
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always maintain base version">
+    Update base after every successful sync:
+    
+    ```typescript
+    await saveToFirebase(data);
+    updateBaseAfterSync(data); // Critical!
+    ```
+  </Accordion>
+  
+  <Accordion title="Default to server in conflicts">
+    When in doubt, prefer server values (they're already backed up):
+    
+    ```typescript
+    const merged: PersonalInfo = { ...server }; // Start with server
+    // Then selectively apply local changes
+    ```
+  </Accordion>
+  
+  <Accordion title="Show clear conflict descriptions">
+    Make conflicts understandable to users:
+    
+    ```typescript
+    description: getFieldDisplayName("personal", "email")
+    // "Personal Info: Email" (user-friendly)
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle missing base gracefully">
+    First sync won't have base version:
+    
+    ```typescript
+    if (!base) {
+      // Can't do three-way merge - prefer server
+      return { merged: server, conflicts: [], hasConflicts: false };
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Merge Logic
+
+```typescript
+import { threeWayMerge } from '@/lib/backend/cvThreeWayMerge';
+import { initialCVData } from '@/lib/types';
+
+// Test: Local change only
+const base = { ...initialCVData, personalInfo: { ...initialCVData.personalInfo, fullName: "John" } };
+const local = { ...base, personalInfo: { ...base.personalInfo, fullName: "Jane" } };
+const server = base;
+
+const result = threeWayMerge(local, server, base);
+console.log(result.merged.personalInfo.fullName); // "Jane" (local change)
+console.log(result.hasConflicts); // false
+
+// Test: Conflicting changes
+const local2 = { ...base, personalInfo: { ...base.personalInfo, fullName: "Jane" } };
+const server2 = { ...base, personalInfo: { ...base.personalInfo, fullName: "Bob" } };
+
+const result2 = threeWayMerge(local2, server2, base);
+console.log(result2.hasConflicts); // true
+console.log(result2.conflicts[0].localValue); // "Jane"
+console.log(result2.conflicts[0].serverValue); // "Bob"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Local Storage" icon="hard-drive" href="/advanced/local-storage">
+    Learn about draft and base storage
+  </Card>
+  <Card title="Data Structure" icon="database" href="/advanced/data-structure">
+    Review complete type definitions
+  </Card>
+</CardGroup>

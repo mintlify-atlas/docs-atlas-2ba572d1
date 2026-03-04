@@ -1,0 +1,536 @@
+---
+title: Templates
+description: Template system for customizable CV layouts including default, Rhyhorn, and Nexus templates
+---
+
+## Overview
+
+The template system provides multiple pre-designed CV layouts. Each template consists of:
+
+1. **Browser rendering component** (for live preview)
+2. **PDF rendering component** (for export)
+3. **Template configuration** (metadata and capabilities)
+
+## Source Files
+
+- **Template Types**: `components/templates/types.ts`
+- **Default Template**: Built into `CVPreview.tsx` and `PDFDocument.tsx`
+- **Rhyhorn Template**: `components/templates/rhyhorn/`
+- **Nexus Template**: `components/templates/nexus/`
+
+## Template Configuration
+
+Templates are defined with metadata and capabilities:
+
+```tsx
+interface TemplateConfig {
+  id: TemplateId;
+  name: string;
+  description: string;
+  tags: string[];
+  layout: "single-column" | "two-column";
+  supportsProfileImage: boolean;
+}
+```
+
+### Available Templates
+
+<ParamField path="default" type="TemplateConfig">
+  **Classic** - Traditional CV layout with navy blue header and professional styling
+
+  ```tsx
+  {
+    id: 'default',
+    name: 'Classic',
+    description: 'Traditional CV layout with navy blue header and professional styling',
+    tags: ['classic', 'professional', 'ATS-friendly'],
+    layout: 'single-column',
+    supportsProfileImage: false,
+  }
+  ```
+</ParamField>
+
+<ParamField path="rhyhorn" type="TemplateConfig">
+  **Rhyhorn** - Single-column with minimal header and lots of whitespace; clean and modern
+
+  ```tsx
+  {
+    id: 'rhyhorn',
+    name: 'Rhyhorn',
+    description: 'Single-column with minimal header and lots of whitespace; clean and modern',
+    tags: ['minimal', 'clean', 'modern', 'designer', 'ATS-friendly'],
+    layout: 'single-column',
+    supportsProfileImage: true,
+  }
+  ```
+</ParamField>
+
+<ParamField path="nexus" type="TemplateConfig">
+  **Nexus** - Two-column layout with a highlighted sidebar and structured right-column content
+
+  ```tsx
+  {
+    id: 'nexus',
+    name: 'Nexus',
+    description: 'Two-column layout with a highlighted sidebar and structured right-column content',
+    tags: ['two-column', 'modern', 'structured', 'professional'],
+    layout: 'two-column',
+    supportsProfileImage: true,
+  }
+  ```
+</ParamField>
+
+## Template ID Type
+
+```tsx
+export type TemplateId = "default" | "rhyhorn" | "nexus";
+```
+
+Used throughout the application for type-safe template references.
+
+## Template Utilities
+
+### getTemplateById
+
+Retrieve template configuration by ID:
+
+```tsx
+export function getTemplateById(id: TemplateId): TemplateConfig {
+  return templates.find((t) => t.id === id) || templates[0];
+}
+```
+
+**Usage:**
+
+```tsx
+const config = getTemplateById("rhyhorn");
+console.log(config.name); // "Rhyhorn"
+console.log(config.supportsProfileImage); // true
+```
+
+### isValidTemplateId
+
+Validate template ID:
+
+```tsx
+export function isValidTemplateId(id: string): id is TemplateId {
+  return templates.some((t) => t.id === id);
+}
+```
+
+**Usage:**
+
+```tsx
+if (isValidTemplateId(urlParam)) {
+  setTemplate(urlParam);
+}
+```
+
+## Default Template
+
+The default template is built into the preview components.
+
+### Features
+
+- Single-column layout
+- Navy blue decorative header bar
+- Professional styling with Carlito font
+- ATS-friendly structure
+- No profile image support
+
+### Layout
+
+```
+┌────────────────────────────┐
+│  Navy Blue Bar (15px)      │
+├────────────────────────────┤
+│                            │
+│  Personal Info (centered)  │
+│  Name (28pt)               │
+│  Contact Details           │
+│                            │
+├────────────────────────────┤
+│  Career Objective          │
+│  ───────────────           │
+│  Summary text...           │
+│                            │
+├────────────────────────────┤
+│  Key Skills                │
+│  ───────────────           │
+│  • Technical skills        │
+│  • Professional skills     │
+│                            │
+├────────────────────────────┤
+│  Other Sections...         │
+│                            │
+└────────────────────────────┘
+```
+
+### Styling
+
+```tsx
+const styles = {
+  page: {
+    fontFamily: "Carlito, Calibri, Arial, sans-serif",
+    fontSize: "11pt",
+    lineHeight: "1.3",
+    padding: "0.5in",
+  },
+  name: {
+    fontSize: "28pt",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  sectionTitle: {
+    fontSize: "13pt",
+    fontWeight: "bold",
+    marginBottom: "4px",
+  },
+};
+```
+
+## Rhyhorn Template
+
+Minimalist single-column template with clean design.
+
+### File Structure
+
+```
+components/templates/rhyhorn/
+├── RhyhornTemplate.tsx    # Browser rendering
+├── RhyhornPDF.tsx         # PDF rendering
+├── RhyhornHeader.tsx      # Header component
+└── sections/              # Section components
+    ├── ExperienceSection.tsx
+    ├── EducationSection.tsx
+    ├── ProjectsSection.tsx
+    ├── SkillsSection.tsx
+    ├── LanguagesSection.tsx
+    ├── AchievementsSection.tsx
+    └── ReferencesSection.tsx
+```
+
+### Usage
+
+```tsx
+import { RhyhornTemplate } from "@/components/templates/rhyhorn/RhyhornTemplate";
+import { RhyhornPDF } from "@/components/templates/rhyhorn/RhyhornPDF";
+
+// Browser preview
+<RhyhornTemplate data={cvData} />;
+
+// PDF export
+await pdf(<RhyhornPDF data={cvData} />).toBlob();
+```
+
+### Component Structure
+
+```tsx
+export const RhyhornTemplate = React.memo(function RhyhornTemplate({
+  data,
+  className,
+  id,
+}) {
+  const visibleSections = useMemo(
+    () => getVisibleSections(normalizeSectionOrder(data.sectionOrder), data.hiddenSections),
+    [data.sectionOrder, data.hiddenSections]
+  );
+
+  const renderSection = (sectionId: SectionId) => {
+    switch (sectionId) {
+      case "personal":
+        return <RhyhornHeader personalInfo={personalInfo} />;
+      case "experience":
+        return <ExperienceSection experience={experience} />;
+      // ...
+    }
+  };
+
+  return (
+    <div className={cn("bg-white", className)} id={id}>
+      {visibleSections.map((sectionId) => renderSection(sectionId))}
+    </div>
+  );
+});
+```
+
+### Features
+
+- Profile image in header (circular)
+- Minimal decorative elements
+- Generous whitespace
+- Clean typography hierarchy
+- Section-based architecture
+- Fully responsive
+
+### Layout
+
+```
+┌────────────────────────────┐
+│  ┌───┐                     │
+│  │IMG│  Name               │
+│  └───┘  Job Title          │
+│         Contact Info       │
+├────────────────────────────┤
+│  Summary                   │
+│  Short bio text...         │
+│                            │
+├────────────────────────────┤
+│  EXPERIENCE                │
+│                            │
+│  Job Title | Company       │
+│  Date Range                │
+│  • Responsibility 1        │
+│  • Responsibility 2        │
+│                            │
+└────────────────────────────┘
+```
+
+### Section Components
+
+Each section is a separate component:
+
+```tsx
+// ExperienceSection.tsx
+export function ExperienceSection({ experience }: { experience: Experience[] }) {
+  if (experience.length === 0) return null;
+
+  return (
+    <RhyhornSection title="EXPERIENCE">
+      {experience.map((job) => (
+        <div key={job.id}>
+          <div className="flex justify-between">
+            <span className="font-semibold">{job.role}</span>
+            <span className="text-sm text-gray-600">{job.startDate} - {job.endDate}</span>
+          </div>
+          <div className="text-sm text-gray-700">{job.company}</div>
+          {/* ... */}
+        </div>
+      ))}
+    </RhyhornSection>
+  );
+}
+```
+
+## Nexus Template
+
+Two-column layout with sidebar and main content area.
+
+### File Structure
+
+```
+components/templates/nexus/
+├── NexusTemplate.tsx      # Browser rendering
+└── NexusPDF.tsx          # PDF rendering
+```
+
+### Usage
+
+```tsx
+import { NexusTemplate } from "@/components/templates/nexus/NexusTemplate";
+import { NexusPDF } from "@/components/templates/nexus/NexusPDF";
+
+// Browser preview
+<NexusTemplate data={cvData} />;
+
+// PDF export
+await pdf(<NexusPDF data={cvData} />).toBlob();
+```
+
+### Features
+
+- Two-column layout (35/65 split)
+- Colored sidebar background
+- Profile image in sidebar
+- Skills and contact in sidebar
+- Main content in right column
+- Modern, structured design
+
+### Layout
+
+```
+┌─────────┬──────────────────┐
+│         │                  │
+│ ┌─────┐ │  Name            │
+│ │ IMG │ │  Job Title       │
+│ └─────┘ │                  │
+│         ├──────────────────┤
+│ CONTACT │  SUMMARY         │
+│ • Email │  Bio text...     │
+│ • Phone │                  │
+│         ├──────────────────┤
+│ SKILLS  │  EXPERIENCE      │
+│ • Skill │  Job | Company   │
+│ • Skill │  Date Range      │
+│         │  • Details       │
+│ LANGS   │                  │
+│ • Lang  │  EDUCATION       │
+│         │  Degree          │
+│         │  School          │
+└─────────┴──────────────────┘
+```
+
+### Sidebar Sections
+
+- Profile image
+- Contact information
+- Skills (technical & professional)
+- Languages
+
+### Main Content Sections
+
+- Name and job title
+- Professional summary
+- Work experience
+- Education
+- Projects
+- Achievements
+
+## Creating a New Template
+
+To add a new template:
+
+### 1. Define Template Config
+
+```tsx
+// components/templates/types.ts
+export type TemplateId = "default" | "rhyhorn" | "nexus" | "newtemplate";
+
+export const templates: TemplateConfig[] = [
+  // ...
+  {
+    id: "newtemplate",
+    name: "New Template",
+    description: "Description of new template",
+    tags: ["tag1", "tag2"],
+    layout: "single-column",
+    supportsProfileImage: true,
+  },
+];
+```
+
+### 2. Create Template Components
+
+```tsx
+// components/templates/newtemplate/NewTemplate.tsx
+import React from "react";
+import { CVData } from "@/lib/types";
+
+interface NewTemplateProps {
+  data: CVData;
+  className?: string;
+  id?: string;
+}
+
+export const NewTemplate = React.memo(function NewTemplate({
+  data,
+  className,
+  id,
+}: NewTemplateProps) {
+  return (
+    <div className={className} id={id}>
+      {/* Template markup */}
+    </div>
+  );
+});
+```
+
+```tsx
+// components/templates/newtemplate/NewTemplatePDF.tsx
+import { Document, Page, View, Text } from "@react-pdf/renderer";
+import { CVData } from "@/lib/types";
+
+export function NewTemplatePDF({ data }: { data: CVData }) {
+  return (
+    <Document>
+      <Page size="A4">
+        {/* PDF markup */}
+      </Page>
+    </Document>
+  );
+}
+```
+
+### 3. Register in Preview Components
+
+```tsx
+// components/preview/CVPreview.tsx
+import { NewTemplate } from "@/components/templates/newtemplate/NewTemplate";
+
+if (activeTemplate === "newtemplate") {
+  return <NewTemplate data={data} className={className} id={id} />;
+}
+```
+
+```tsx
+// components/preview/PDFDocument.tsx
+import { NewTemplatePDF } from "@/components/templates/newtemplate/NewTemplatePDF";
+
+if (activeTemplate === "newtemplate") {
+  return <NewTemplatePDF data={data} />;
+}
+```
+
+### 4. Add to Template Selector
+
+The template selector automatically picks up templates from the configuration.
+
+## Template Best Practices
+
+### Visual Consistency
+
+- Ensure HTML preview matches PDF output
+- Use same fonts, colors, and spacing
+- Test with various data lengths
+
+### Responsive Design
+
+- Mobile-friendly layouts
+- Scale appropriately for small screens
+- Maintain readability at all sizes
+
+### ATS-Friendly
+
+- Use semantic HTML structure
+- Avoid complex layouts for ATS parsing
+- Clear section headings
+- Standard fonts
+
+### Performance
+
+- Use React.memo for components
+- Minimize re-renders with useMemo
+- Lazy-load heavy components
+- Optimize font loading
+
+### Accessibility
+
+- Semantic HTML elements
+- Proper heading hierarchy
+- Sufficient color contrast
+- Screen reader friendly
+
+## Template Switching
+
+Templates can be switched dynamically:
+
+```tsx
+// In CVBuilder
+const [currentTemplate, setCurrentTemplate] = useState<TemplateId>("default");
+
+<TemplateSelector
+  currentTemplate={currentTemplate}
+  onTemplateChange={(template) =>
+    methods.setValue("template", template, { shouldDirty: true })
+  }
+/>;
+
+// Preview automatically updates
+<CVPreview data={data} template={currentTemplate} />;
+```
+
+## Related Components
+
+- [CVBuilder](/api/components/cv-builder) - Main component
+- [Preview Components](/api/components/preview) - CVPreview and PDFDocument
+- [Form Components](/api/components/forms) - Data input

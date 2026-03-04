@@ -1,0 +1,469 @@
+---
+title: 'useCVVersions'
+description: 'React hook for managing CV version history with CRUD operations and pagination'
+---
+
+## Overview
+
+The `useCVVersions` hook provides complete version control functionality including creating, listing, restoring, updating, and deleting CV versions. It includes pagination, search, and optimistic UI updates.
+
+## Import
+
+```typescript
+import { useCVVersions } from '@/hooks/useCVVersions';
+```
+
+## Usage
+
+```typescript
+const VersionHistory = () => {
+  const { user } = useAuth();
+  
+  const {
+    versions,
+    isLoading,
+    hasMore,
+    saveNewVersion,
+    restoreToVersion,
+    deleteVersionById,
+    updateVersion,
+    loadMore,
+    searchVersionsList
+  } = useCVVersions({
+    userId: user?.uid ?? null
+  });
+
+  const handleSave = async () => {
+    const versionId = await saveNewVersion({
+      versionName: 'Senior Developer Resume',
+      description: 'Updated for tech company applications',
+      tags: ['tech', 'senior', '2024']
+    });
+    
+    if (versionId) {
+      toast.success('Version saved!');
+    }
+  };
+
+  const handleRestore = async (versionId: string) => {
+    const success = await restoreToVersion(versionId);
+    if (success) {
+      toast.success('Version restored');
+      window.location.reload(); // Reload to show restored data
+    }
+  };
+
+  return (
+    <div>
+      <SearchBar onSearch={searchVersionsList} />
+      <VersionList versions={versions} onRestore={handleRestore} />
+      {hasMore && <LoadMoreButton onClick={loadMore} />}
+    </div>
+  );
+};
+```
+
+## Parameters
+
+<ParamField path="userId" type="string | null" required>
+  User ID to fetch versions for. Pass `null` for unauthenticated users (no versions will load).
+</ParamField>
+
+## Return Value
+
+### State
+
+<ResponseField name="versions" type="CVVersionMetadata[]">
+  Array of version metadata objects, sorted by creation date (newest first).
+  
+  **Structure:**
+  ```typescript
+  interface CVVersionMetadata {
+    id: string;
+    userId: string;
+    versionName: string;
+    description?: string;
+    tags?: string[];
+    createdAt: Date;
+    isAutoSave: boolean;
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean">
+  `true` while loading initial versions or performing search.
+</ResponseField>
+
+<ResponseField name="isLoadingMore" type="boolean">
+  `true` while loading additional pages via pagination.
+</ResponseField>
+
+<ResponseField name="hasMore" type="boolean">
+  `true` if more versions are available to load. `false` during search mode.
+</ResponseField>
+
+<ResponseField name="error" type="string | null">
+  Error message if version operations fail. `null` when no error.
+</ResponseField>
+
+<ResponseField name="isSaving" type="boolean">
+  `true` while saving a new version.
+</ResponseField>
+
+<ResponseField name="isRestoring" type="boolean">
+  `true` while restoring a version.
+</ResponseField>
+
+<ResponseField name="isDeleting" type="string | null">
+  ID of version currently being deleted. `null` when no deletion in progress.
+</ResponseField>
+
+### Actions
+
+<ResponseField name="refreshVersions" type="() => Promise<void>">
+  Reload versions list from the beginning. Resets pagination.
+  
+  **Use cases:**
+  - After creating a version externally
+  - Manual refresh button
+  - Clearing filters
+</ResponseField>
+
+<ResponseField name="loadMore" type="() => Promise<void>">
+  Load next page of versions (20 per page).
+  
+  **Behavior:**
+  - Disabled during search mode
+  - Does nothing if `hasMore` is `false`
+  - Appends results to existing `versions` array
+</ResponseField>
+
+<ResponseField name="saveNewVersion" type="(input: CVVersionInput) => Promise<string | null>">
+  Save current form data as a new version.
+  
+  **Parameters:**
+  ```typescript
+  interface CVVersionInput {
+    versionName: string;
+    description?: string;
+    tags?: string[];
+  }
+  ```
+  
+  **Returns:** Version ID on success, `null` on failure
+  
+  **Side effects:**
+  - Optimistically adds version to list
+  - Uses current form data via `getValues()`
+</ResponseField>
+
+<ResponseField name="getVersionData" type="(versionId: string) => Promise<CVVersion | null>">
+  Fetch complete version data including CV content.
+  
+  **Returns:**
+  ```typescript
+  interface CVVersion {
+    id: string;
+    userId: string;
+    data: CVData;           // Full CV content
+    versionName: string;
+    description?: string;
+    tags?: string[];
+    createdAt: Date;
+    isAutoSave: boolean;
+  }
+  ```
+  
+  **Use cases:**
+  - Preview version before restoring
+  - Compare versions
+  - Export version data
+</ResponseField>
+
+<ResponseField name="restoreToVersion" type="(versionId: string) => Promise<boolean>">
+  Restore CV to a specific version.
+  
+  **Returns:** `true` on success, `false` on failure
+  
+  **Behavior:**
+  1. Fetches version data
+  2. Updates main CV document
+  3. Does NOT update form state (requires page reload)
+  
+  **Important:** Call `window.location.reload()` or re-fetch CV data after restoring.
+</ResponseField>
+
+<ResponseField name="deleteVersionById" type="(versionId: string) => Promise<boolean>">
+  Delete a version permanently.
+  
+  **Returns:** `true` on success, `false` on failure
+  
+  **Side effects:**
+  - Optimistically removes from list
+  - Updates `isDeleting` state during operation
+</ResponseField>
+
+<ResponseField name="updateVersion" type="(versionId: string, metadata: Partial<CVVersionInput>) => Promise<boolean>">
+  Update version metadata (name, description, tags).
+  
+  **Parameters:**
+  ```typescript
+  metadata: {
+    versionName?: string;
+    description?: string;
+    tags?: string[];
+  }
+  ```
+  
+  **Returns:** `true` on success, `false` on failure
+  
+  **Side effects:**
+  - Optimistically updates list
+  - Does not modify CV data, only metadata
+</ResponseField>
+
+<ResponseField name="searchVersionsList" type="(searchTerm: string) => Promise<void>">
+  Search versions by name, description, or tags.
+  
+  **Behavior:**
+  - Replaces current versions list with search results
+  - Disables pagination (`hasMore` becomes `false`)
+  - Use `clearSearch()` to restore full list
+</ResponseField>
+
+<ResponseField name="clearSearch" type="() => Promise<void>">
+  Clear search and reload all versions.
+  
+  **Equivalent to:** `refreshVersions()`
+</ResponseField>
+
+## Features
+
+### Pagination
+
+Loads 20 versions per page:
+
+```typescript
+const PAGE_SIZE = 20;
+
+const VersionList = () => {
+  const { versions, hasMore, isLoadingMore, loadMore } = useCVVersions({ userId });
+  
+  return (
+    <div>
+      {versions.map(v => <VersionCard key={v.id} version={v} />)}
+      
+      {hasMore && (
+        <Button onClick={loadMore} disabled={isLoadingMore}>
+          {isLoadingMore ? 'Loading...' : 'Load More'}
+        </Button>
+      )}
+    </div>
+  );
+};
+```
+
+### Optimistic UI Updates
+
+Updates UI immediately before server confirms:
+
+```typescript
+// Save: Adds to list immediately
+const versionId = await saveNewVersion(input);
+// Version appears in list right away
+
+// Delete: Removes from list immediately
+const success = await deleteVersionById(versionId);
+// Version disappears right away
+
+// Update: Changes metadata immediately
+const success = await updateVersion(versionId, { versionName: 'New Name' });
+// Name changes right away
+```
+
+### Search Mode
+
+Disables pagination during search:
+
+```typescript
+const SearchableVersions = () => {
+  const [query, setQuery] = useState('');
+  const { versions, searchVersionsList, clearSearch, hasMore } = useCVVersions({ userId });
+  
+  const handleSearch = async (term: string) => {
+    setQuery(term);
+    if (term) {
+      await searchVersionsList(term);
+    } else {
+      await clearSearch();
+    }
+  };
+  
+  return (
+    <div>
+      <SearchInput value={query} onChange={handleSearch} />
+      <VersionList versions={versions} />
+      {/* Load More button hidden during search (hasMore = false) */}
+    </div>
+  );
+};
+```
+
+## Advanced Examples
+
+### Version Comparison
+
+```typescript
+const VersionComparison = ({ versionId1, versionId2 }) => {
+  const { getVersionData } = useCVVersions({ userId });
+  const [versions, setVersions] = useState<[CVVersion, CVVersion] | null>(null);
+  
+  useEffect(() => {
+    const load = async () => {
+      const [v1, v2] = await Promise.all([
+        getVersionData(versionId1),
+        getVersionData(versionId2)
+      ]);
+      
+      if (v1 && v2) setVersions([v1, v2]);
+    };
+    load();
+  }, [versionId1, versionId2]);
+  
+  if (!versions) return <Loading />;
+  
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <VersionPreview data={versions[0].data} />
+      <VersionPreview data={versions[1].data} />
+    </div>
+  );
+};
+```
+
+### Bulk Operations
+
+```typescript
+const BulkDelete = ({ versionIds }: { versionIds: string[] }) => {
+  const { deleteVersionById } = useCVVersions({ userId });
+  const [progress, setProgress] = useState(0);
+  
+  const handleBulkDelete = async () => {
+    for (let i = 0; i < versionIds.length; i++) {
+      await deleteVersionById(versionIds[i]);
+      setProgress(((i + 1) / versionIds.length) * 100);
+    }
+    
+    toast.success(`Deleted ${versionIds.length} versions`);
+  };
+  
+  return (
+    <div>
+      <Button onClick={handleBulkDelete}>Delete Selected</Button>
+      <Progress value={progress} />
+    </div>
+  );
+};
+```
+
+### Auto-Save Versions
+
+```typescript
+const AutoSaveManager = () => {
+  const { saveNewVersion } = useCVVersions({ userId });
+  const form = useFormContext<CVData>();
+  
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (form.formState.isDirty) {
+        await saveNewVersion({
+          versionName: `Auto-save ${new Date().toLocaleString()}`,
+          description: 'Automatic backup',
+          tags: ['auto-save']
+        });
+        
+        console.log('Auto-save complete');
+      }
+    }, 60000); // Every minute
+    
+    return () => clearInterval(interval);
+  }, [form.formState.isDirty]);
+  
+  return null;
+};
+```
+
+## Dependencies
+
+Requires React Hook Form context:
+
+```typescript
+import { FormProvider, useForm } from 'react-hook-form';
+
+const App = () => {
+  const form = useForm<CVData>();
+  
+  return (
+    <FormProvider {...form}>
+      <VersionHistory />
+    </FormProvider>
+  );
+};
+```
+
+## Best Practices
+
+### Handle Loading States
+
+```typescript
+if (isLoading) {
+  return <SkeletonList count={5} />;
+}
+
+if (error) {
+  return <ErrorMessage message={error} />;
+}
+
+return <VersionList versions={versions} />;
+```
+
+### Confirm Destructive Actions
+
+```typescript
+const handleDelete = async (versionId: string) => {
+  const confirmed = await confirm({
+    title: 'Delete Version?',
+    description: 'This action cannot be undone.',
+    confirmText: 'Delete'
+  });
+  
+  if (confirmed) {
+    await deleteVersionById(versionId);
+  }
+};
+```
+
+### Reload After Restore
+
+```typescript
+const handleRestore = async (versionId: string) => {
+  const success = await restoreToVersion(versionId);
+  
+  if (success) {
+    toast.success('Version restored');
+    
+    // Option 1: Reload page
+    window.location.reload();
+    
+    // Option 2: Re-fetch and update form
+    const cv = await loadCV(userId);
+    form.reset(cv);
+  }
+};
+```
+
+## Related
+
+- [useCVDraft](/api/hooks/use-cv-draft) - Draft management and auto-save
+- [CVVersion Types](/api/types/version-control) - Version data structures
+- [CVData](/api/types/cv-data) - CV content structure

@@ -1,0 +1,304 @@
+---
+title: 'useCVDraft'
+description: 'React hook for managing CV draft state with auto-save, cloud sync, and conflict resolution'
+---
+
+## Overview
+
+The `useCVDraft` hook manages CV draft state with automatic saving to localStorage, cloud synchronization, and three-way merge conflict detection. It handles both authenticated and guest user workflows.
+
+## Import
+
+```typescript
+import { useCVDraft } from '@/hooks/useCVDraft';
+```
+
+## Usage
+
+```typescript
+const CVBuilder = () => {
+  const { user, isAuthLoading } = useAuth();
+  const form = useFormContext<CVData>();
+  
+  const {
+    isLoading,
+    hasPendingSave,
+    saveToDraft,
+    saveToCloud,
+    checkForConflicts,
+    syncAfterAuth
+  } = useCVDraft({
+    user,
+    isAuthLoading,
+    initialTemplate: 'default',
+    onError: (message, context) => {
+      console.error(`Error during ${context}:`, message);
+      toast.error(message);
+    }
+  });
+
+  const handleSave = async () => {
+    if (user) {
+      const success = await saveToCloud();
+      if (success) {
+        toast.success('CV saved to cloud');
+      }
+    } else {
+      saveToDraft();
+      toast.success('Draft saved locally');
+    }
+  };
+
+  return (
+    <div>
+      {isLoading ? <Spinner /> : <CVForm />}
+      {hasPendingSave && <ConflictBanner />}
+    </div>
+  );
+};
+```
+
+## Parameters
+
+<ParamField path="user" type="User | null" required>
+  Firebase authenticated user object. Pass `null` for guest users.
+</ParamField>
+
+<ParamField path="isAuthLoading" type="boolean" required>
+  Indicates whether authentication state is still loading. Prevents premature data loading.
+</ParamField>
+
+<ParamField path="initialTemplate" type="TemplateId">
+  Template to apply when loading CV data. Overrides stored template preference.
+  
+  Options: `'default'` | `'rhyhorn'` | `'nexus'`
+</ParamField>
+
+<ParamField path="onError" type="(message: string, context: 'load' | 'save' | 'sync') => void">
+  Error callback with user-friendly messages and context.
+  
+  **Contexts:**
+  - `'load'` - Failed to load CV data
+  - `'save'` - Failed to save to cloud
+  - `'sync'` - Failed to sync after authentication
+</ParamField>
+
+## Return Value
+
+<ResponseField name="isLoading" type="boolean">
+  `true` while initial data is loading. Use to show loading states.
+</ResponseField>
+
+<ResponseField name="hasPendingSave" type="boolean">
+  `true` when local and server data conflict. Indicates user needs to resolve conflicts.
+</ResponseField>
+
+<ResponseField name="saveToDraft" type="() => void">
+  Manually save current form data to localStorage draft.
+  
+  **Behavior:**
+  - Only saves if data has changed
+  - Updates internal tracking reference
+  - Safe to call frequently
+</ResponseField>
+
+<ResponseField name="saveToCloud" type="() => Promise<boolean>">
+  Save current form data to Firebase cloud storage.
+  
+  **Returns:** `true` on success, `false` on failure
+  
+  **Side effects:**
+  - Clears localStorage draft on success
+  - Updates base version for merge tracking
+  - Sets `hasPendingSave` to `false`
+</ResponseField>
+
+<ResponseField name="checkForConflicts" type="() => Promise<ConflictCheckResult>">
+  Check for conflicts between local draft and server data.
+  
+  **Returns:**
+  ```typescript
+  {
+    hasConflict: boolean;
+    localData?: CVData;
+    serverData?: CVData;
+    baseData?: CVData;      // For three-way merge
+    localDate?: Date;
+    serverDate?: Date;
+  }
+  ```
+  
+  **Use cases:**
+  - Before syncing after login
+  - When `hasPendingSave` is true
+  - Manual conflict detection
+</ResponseField>
+
+<ResponseField name="syncAfterAuth" type="(newUser: User) => Promise<void>">
+  Sync data immediately after user authentication (login/signup).
+  
+  **Parameters:**
+  - `newUser` - Newly authenticated Firebase user
+  
+  **Behavior:**
+  1. Compares local draft with server data
+  2. If conflict detected, sets `hasPendingSave` to `true`
+  3. If no conflict, loads server data or uploads local data
+  4. Updates form with resolved data
+</ResponseField>
+
+## Features
+
+### Auto-Save
+
+Auto-saves draft every 5 seconds when content changes:
+
+```typescript
+const AUTO_SAVE_INTERVAL = 5000; // 5 seconds
+```
+
+**Auto-save triggers:**
+- Meaningful content exists (personal info, experiences, etc.)
+- Template or section order changes
+- Data differs from last saved state
+
+### Data Validation
+
+Automatically sanitizes and validates loaded data:
+
+```typescript
+const sanitizeLoadedData = (rawData: CVData): CVData => {
+  return {
+    personalInfo: { ...rawData.personalInfo },
+    experience: [...rawData.experience],
+    sectionOrder: normalizeSectionOrder(rawData.sectionOrder),
+    hiddenSections: [...new Set(rawData.hiddenSections)].filter(
+      id => id !== 'personal' // Prevent hiding personal section
+    ),
+    template: isValidTemplateId(rawData.template) ? rawData.template : 'default',
+    // ... other fields
+  };
+};
+```
+
+### Conflict Detection
+
+Uses three-way merge strategy:
+
+1. **Base** - Last successfully synced version
+2. **Local** - Current local draft
+3. **Server** - Current server state
+
+Skips conflict detection if:
+- Local draft has no meaningful content
+- Local and server data are identical
+- User is not authenticated
+
+### Error Handling
+
+Provides user-friendly error messages:
+
+```typescript
+const errorMessages = {
+  permission: 'Session expired. Please sign in again.',
+  network: 'Network error. Please check your connection.',
+  quota: 'Storage limit exceeded. Try removing some content.',
+  default: 'Failed to load your saved CV data.'
+};
+```
+
+## Dependencies
+
+Requires React Hook Form context:
+
+```typescript
+import { FormProvider, useForm } from 'react-hook-form';
+import { CVData, initialCVData } from '@/lib/types';
+
+const CVBuilderWrapper = () => {
+  const form = useForm<CVData>({
+    defaultValues: initialCVData
+  });
+
+  return (
+    <FormProvider {...form}>
+      <CVBuilder />
+    </FormProvider>
+  );
+};
+```
+
+## State Management
+
+### Internal Refs
+
+```typescript
+const lastSavedDataRef = useRef<CVData | null>(null);     // Tracks last saved state
+const hasLoadedRef = useRef(false);                        // Prevents duplicate loads
+const loadRequestIdRef = useRef(0);                        // Cancels stale requests
+const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null); // Auto-save timer
+```
+
+### Load Priority
+
+1. **Authenticated users:** Server data → Local draft (if conflict)
+2. **Guest users:** Local draft only
+3. **After login:** Sync local draft with server
+
+## Best Practices
+
+### Handle Loading States
+
+```typescript
+if (isLoading) {
+  return <LoadingSpinner />;
+}
+
+return <CVEditor />;
+```
+
+### Resolve Conflicts
+
+```typescript
+if (hasPendingSave) {
+  const conflict = await checkForConflicts();
+  
+  if (conflict.hasConflict) {
+    // Show conflict resolution UI
+    return (
+      <ConflictResolver
+        localData={conflict.localData}
+        serverData={conflict.serverData}
+        baseData={conflict.baseData}
+        onResolve={(merged) => {
+          form.reset(merged);
+          await saveToCloud();
+        }}
+      />
+    );
+  }
+}
+```
+
+### Save Before Navigation
+
+```typescript
+useEffect(() => {
+  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (form.formState.isDirty) {
+      e.preventDefault();
+      saveToDraft();
+      e.returnValue = '';
+    }
+  };
+  
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+}, [form.formState.isDirty, saveToDraft]);
+```
+
+## Related
+
+- [useCVVersions](/api/hooks/use-cv-versions) - Version control operations
+- [CVData](/api/types/cv-data) - CV data structure
+- [MergeResult](/api/types/merge-result) - Conflict resolution types
